@@ -22,14 +22,14 @@ export default function LoginForm() {
       if (isSignUp) {
         const { error } = await supabase.auth.signUp({ email, password })
         if (error) throw error
-        setError('Check your email for a confirmation link.')
+        setError('Tjek din email for et bekræftelseslink.')
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
         router.push('/builder')
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'An error occurred'
+      const message = err instanceof Error ? err.message : 'Der opstod en fejl'
       setError(message)
     } finally {
       setLoading(false)
@@ -45,13 +45,13 @@ export default function LoginForm() {
             <span className="text-white text-xl font-bold">TB</span>
           </div>
           <h1 className="text-2xl font-semibold text-gray-900">ThinkBot</h1>
-          <p className="text-sm text-gray-500 mt-1">AI for critical thinking</p>
+          <p className="text-sm text-gray-500 mt-1">AI til kritisk tænkning</p>
         </div>
 
         {/* Form */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
           <h2 className="text-lg font-medium text-gray-900 mb-4">
-            {isSignUp ? 'Create an account' : 'Sign in'}
+            {isSignUp ? 'Opret en konto' : 'Log ind'}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -66,13 +66,13 @@ export default function LoginForm() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent"
-                placeholder="you@school.dk"
+                placeholder="dig@skole.dk"
               />
             </div>
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Password
+                Adgangskode
               </label>
               <input
                 id="password"
@@ -82,12 +82,12 @@ export default function LoginForm() {
                 required
                 minLength={6}
                 className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent"
-                placeholder="Min. 6 characters"
+                placeholder="Min. 6 tegn"
               />
             </div>
 
             {error && (
-              <p className={`text-sm ${error.includes('Check your email') ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`text-sm ${error.includes('Tjek din email') ? 'text-green-600' : 'text-red-600'}`}>
                 {error}
               </p>
             )}
@@ -97,7 +97,7 @@ export default function LoginForm() {
               disabled={loading}
               className="w-full py-2.5 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Please wait...' : isSignUp ? 'Sign up' : 'Sign in'}
+              {loading ? 'Vent venligst...' : isSignUp ? 'Opret konto' : 'Log ind'}
             </button>
           </form>
 
@@ -109,7 +109,7 @@ export default function LoginForm() {
               }}
               className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
             >
-              {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+              {isSignUp ? 'Har du allerede en konto? Log ind' : 'Har du ikke en konto? Opret en'}
             </button>
           </div>
         </div>
