@@ -17,98 +17,98 @@ interface BlockConfig {
 
 const BLOCKS: BlockConfig[] = [
   {
-    label: 'ROLE',
-    prefix: 'You are a ',
+    label: 'ROLLE',
+    prefix: 'Du er en ',
     color: { bg: '#CECBF6', border: '#AFA9EC', text: '#5B52C9' },
     dropdowns: [
       {
         key: 'role',
         options: [
-          'Socratic tutor',
-          'Writing coach',
-          'Critical thinking guide',
-          'Homework assistant',
-          'Subject specialist',
+          'Sokratisk tutor',
+          'Skrivecoach',
+          'Kritisk tænkning-guide',
+          'Lektiehjælper',
+          'Fagspecialist',
         ],
       },
     ],
   },
   {
-    label: 'CONTEXT',
-    prefix: 'for ',
+    label: 'KONTEKST',
+    prefix: 'for elever i ',
     suffix: '',
     color: { bg: '#9FE1CB', border: '#5DCAA5', text: '#1D7A55' },
     dropdowns: [
       {
         key: 'grade',
-        options: ['8th grade', '9th grade', 'Upper secondary', 'All grade levels'],
+        options: ['8. klasse', '9. klasse', 'Gymnasiet', 'Alle klassetrin'],
       },
       {
         key: 'subject',
-        options: ['Danish', 'English', 'Mathematics', 'History', 'Science', 'Any subject'],
+        options: ['Dansk', 'Engelsk', 'Matematik', 'Historie', 'Naturfag', 'Alle fag'],
       },
     ],
   },
   {
-    label: 'GOAL',
-    prefix: 'Your goal is to ',
+    label: 'MÅL',
+    prefix: 'Dit mål er at ',
     color: { bg: '#B5D4F4', border: '#85B7EB', text: '#2563A8' },
     dropdowns: [
       {
         key: 'goal',
         options: [
-          'Develop critical thinking',
-          'Support independent problem-solving',
-          'Explain difficult concepts',
-          'Give constructive feedback',
+          'Udvikle kritisk tænkning',
+          'Støtte selvstændig problemløsning',
+          'Forklare svære begreber',
+          'Give konstruktiv feedback',
         ],
       },
     ],
   },
   {
-    label: 'BEHAVIOUR',
-    prefix: 'Always ',
+    label: 'ADFÆRD',
+    prefix: 'Altid ',
     color: { bg: '#FAC775', border: '#EF9F27', text: '#8B5A00' },
     dropdowns: [
       {
         key: 'behaviour',
         options: [
-          'Ask guiding questions rather than giving direct answers',
-          'Prompt student reflection before responding',
-          'Break down complex problems into smaller steps',
-          'Affirm student effort and reasoning',
+          'Stil guidende spørgsmål i stedet for at give direkte svar',
+          'Få eleven til at reflektere før du svarer',
+          'Opdel komplekse problemer i mindre trin',
+          'Anerkend elevens indsats og ræsonnement',
         ],
       },
     ],
   },
   {
-    label: 'LANGUAGE',
-    prefix: 'Respond in ',
+    label: 'SPROG',
+    prefix: 'Svar på ',
     color: { bg: '#C0DD97', border: '#97C459', text: '#3D6B0F' },
     dropdowns: [
       {
         key: 'language',
         options: [
-          'The same language the student uses',
-          'Danish',
-          'English',
-          'Simple age-appropriate language',
+          'Samme sprog som eleven bruger',
+          'Dansk',
+          'Engelsk',
+          'Simpelt aldersvarende sprog',
         ],
       },
     ],
   },
   {
-    label: 'RESTRICTION',
-    prefix: 'Never ',
+    label: 'BEGRÆNSNING',
+    prefix: 'Aldrig ',
     color: { bg: '#F5C4B3', border: '#F0997B', text: '#B8432A' },
     dropdowns: [
       {
         key: 'restriction',
         options: [
-          'Write assignments or essays on behalf of the student',
-          'Reveal the answer without the student having tried first',
-          'Provide information without citing sources',
-          'Use language the student could not have written themselves',
+          'Skriv opgaver eller stile på vegne af eleven',
+          'Afslør svaret uden at eleven har prøvet selv først',
+          'Giv information uden at angive kilder',
+          'Brug sprog som eleven ikke selv kunne have skrevet',
         ],
       },
     ],
@@ -135,12 +135,12 @@ export default function MasterpromptBuilder() {
 
   function assemblePrompt(): string {
     const lines = [
-      `You are a ${selections.role}`,
-      `for ${selections.grade} students in ${selections.subject}`,
-      `Your goal is to ${selections.goal.toLowerCase()}.`,
-      `Always ${selections.behaviour.toLowerCase()}.`,
-      `Respond in ${selections.language.toLowerCase()}.`,
-      `Never ${selections.restriction.toLowerCase()}.`,
+      `Du er en ${selections.role}`,
+      `for elever i ${selections.grade} i ${selections.subject}`,
+      `Dit mål er at ${selections.goal.toLowerCase()}.`,
+      `Altid ${selections.behaviour.toLowerCase()}.`,
+      `Svar på ${selections.language.toLowerCase()}.`,
+      `Aldrig ${selections.restriction.toLowerCase()}.`,
     ]
     return lines.join('. \n')
   }
@@ -164,7 +164,7 @@ export default function MasterpromptBuilder() {
         .from('chat_sessions')
         .insert({
           user_id: user.id,
-          title: 'New chat',
+          title: 'Ny chat',
           masterprompt,
         })
         .select()
@@ -186,9 +186,9 @@ export default function MasterpromptBuilder() {
     <div className="flex flex-col lg:flex-row gap-8 w-full max-w-6xl mx-auto p-6">
       {/* Left: Block Builder */}
       <div className="flex-1 min-w-0">
-        <h2 className="text-2xl font-semibold text-gray-900 mb-1">Build your masterprompt</h2>
+        <h2 className="text-2xl font-semibold text-gray-900 mb-1">Byg din masterprompt</h2>
         <p className="text-sm text-gray-500 mb-6">
-          Configure how ThinkBot should behave in this chat session.
+          Konfigurer hvordan ThinkBot skal opføre sig i denne chatsession.
         </p>
 
         <div className="relative space-y-4">
@@ -225,7 +225,7 @@ export default function MasterpromptBuilder() {
                     <span key={dropdown.key} className="flex items-center gap-2">
                       {dIdx > 0 && (
                         <span className="text-sm text-gray-600">
-                          {block.label === 'CONTEXT' ? 'students in' : ''}
+                          {block.label === 'KONTEKST' ? 'i' : ''}
                         </span>
                       )}
                       <select
@@ -252,7 +252,7 @@ export default function MasterpromptBuilder() {
       {/* Right: Live Preview */}
       <div className="lg:w-96 flex-shrink-0">
         <div className="sticky top-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">Live preview</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">Forhåndsvisning</h3>
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
             <div className="space-y-2 text-sm leading-relaxed">
               <p>
@@ -260,7 +260,7 @@ export default function MasterpromptBuilder() {
                   className="rounded px-1.5 py-0.5 font-medium"
                   style={{ backgroundColor: BLOCKS[0].color.bg }}
                 >
-                  You are a {selections.role}
+                  Du er en {selections.role}
                 </span>
               </p>
               <p>
@@ -268,7 +268,7 @@ export default function MasterpromptBuilder() {
                   className="rounded px-1.5 py-0.5 font-medium"
                   style={{ backgroundColor: BLOCKS[1].color.bg }}
                 >
-                  for {selections.grade} students in {selections.subject}
+                  for elever i {selections.grade} i {selections.subject}
                 </span>
               </p>
               <p>
@@ -276,7 +276,7 @@ export default function MasterpromptBuilder() {
                   className="rounded px-1.5 py-0.5 font-medium"
                   style={{ backgroundColor: BLOCKS[2].color.bg }}
                 >
-                  Your goal is to {selections.goal.toLowerCase()}
+                  Dit mål er at {selections.goal.toLowerCase()}
                 </span>
               </p>
               <p>
@@ -284,7 +284,7 @@ export default function MasterpromptBuilder() {
                   className="rounded px-1.5 py-0.5 font-medium"
                   style={{ backgroundColor: BLOCKS[3].color.bg }}
                 >
-                  Always {selections.behaviour.toLowerCase()}
+                  Altid {selections.behaviour.toLowerCase()}
                 </span>
               </p>
               <p>
@@ -292,7 +292,7 @@ export default function MasterpromptBuilder() {
                   className="rounded px-1.5 py-0.5 font-medium"
                   style={{ backgroundColor: BLOCKS[4].color.bg }}
                 >
-                  Respond in {selections.language.toLowerCase()}
+                  Svar på {selections.language.toLowerCase()}
                 </span>
               </p>
               <p>
@@ -300,7 +300,7 @@ export default function MasterpromptBuilder() {
                   className="rounded px-1.5 py-0.5 font-medium"
                   style={{ backgroundColor: BLOCKS[5].color.bg }}
                 >
-                  Never {selections.restriction.toLowerCase()}
+                  Aldrig {selections.restriction.toLowerCase()}
                 </span>
               </p>
             </div>
@@ -317,7 +317,7 @@ export default function MasterpromptBuilder() {
             disabled={loading}
             className="mt-4 w-full py-3 px-6 rounded-xl bg-gray-900 text-white font-medium text-sm hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Creating session...' : 'Start chat →'}
+            {loading ? 'Opretter session...' : 'Start chat →'}
           </button>
         </div>
       </div>

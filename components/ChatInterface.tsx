@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import ShareButton from './ShareButton'
+import MasterpromptCard from './MasterpromptCard'
 
 interface Message {
   id?: string
@@ -31,6 +32,7 @@ export default function ChatInterface({
   const [title, setTitle] = useState(sessionTitle)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const isNewChat = initialMessages.length === 0
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -122,7 +124,7 @@ export default function ChatInterface({
         const updated = [...prev]
         updated[updated.length - 1] = {
           role: 'assistant',
-          content: 'Sorry, something went wrong. Please try again.',
+          content: 'Beklager, noget gik galt. Prøv venligst igen.',
         }
         return updated
       })
@@ -154,6 +156,9 @@ export default function ChatInterface({
         <ShareButton messages={messages} masterprompt={masterprompt} />
       </div>
 
+      {/* Masterprompt summary card */}
+      <MasterpromptCard masterprompt={masterprompt} defaultExpanded={isNewChat} />
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
         {messages.length === 0 && (
@@ -162,9 +167,9 @@ export default function ChatInterface({
               <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl text-gray-400">TB</span>
               </div>
-              <h3 className="text-lg font-medium text-gray-700">Start a conversation</h3>
+              <h3 className="text-lg font-medium text-gray-700">Start en samtale</h3>
               <p className="text-sm text-gray-400 mt-1">
-                Your masterprompt is loaded. Type your first message below.
+                Din masterprompt er klar. Skriv din første besked nedenfor.
               </p>
             </div>
           </div>
@@ -200,7 +205,7 @@ export default function ChatInterface({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type your message..."
+            placeholder="Skriv din besked..."
             rows={1}
             className="flex-1 resize-none rounded-xl border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent"
           />

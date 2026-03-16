@@ -18,7 +18,7 @@ export default function ShareButton({ messages, masterprompt }: ShareButtonProps
   const [copied, setCopied] = useState(false)
 
   async function handleShare() {
-    const date = new Date().toLocaleDateString('en-US', {
+    const date = new Date().toLocaleDateString('da-DK', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -28,18 +28,18 @@ export default function ShareButton({ messages, masterprompt }: ShareButtonProps
 
     const conversation = messages
       .map((m) => {
-        const label = m.role === 'user' ? '[Student]' : '[ThinkBot]'
+        const label = m.role === 'user' ? '[Elev]' : '[ThinkBot]'
         return `${label}: ${m.content}`
       })
       .join('\n\n')
 
-    const transcript = `--- ThinkBot Chat Export ---
-Date: ${date}
+    const transcript = `--- ThinkBot Samtaleeksport ---
+Dato: ${date}
 
-Masterprompt used:
+Masterprompt brugt:
 ${masterprompt}
 
-Conversation:
+Samtale:
 ${conversation}`
 
     try {
@@ -58,13 +58,13 @@ ${conversation}`
         disabled={messages.length === 0}
         className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        Share with teacher
+        Del med lærer
       </button>
 
       {/* Toast */}
       {copied && (
         <div className="absolute right-0 top-full mt-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap shadow-lg animate-fade-in">
-          Copied to clipboard!
+          Kopieret til udklipsholder!
         </div>
       )}
     </div>
