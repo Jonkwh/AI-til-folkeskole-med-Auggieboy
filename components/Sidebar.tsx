@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import MasterpromptModal from './MasterpromptModal'
 
 interface ChatSession {
   id: string
@@ -19,6 +20,7 @@ export default function Sidebar() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const editInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -115,6 +117,8 @@ export default function Sidebar() {
   }
 
   return (
+    <>
+    <MasterpromptModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     <div className="w-72 h-full bg-gray-50 border-r border-gray-200 flex flex-col">
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
@@ -125,7 +129,7 @@ export default function Sidebar() {
           <span className="text-lg font-semibold text-gray-900">ThinkBot</span>
         </div>
         <button
-          onClick={() => router.push('/builder')}
+          onClick={() => setIsModalOpen(true)}
           className="w-full py-2.5 px-4 rounded-lg border-2 border-dashed border-gray-300 text-sm font-medium text-gray-600 hover:border-gray-400 hover:text-gray-800 transition-colors"
         >
           + Ny chat
@@ -255,5 +259,6 @@ export default function Sidebar() {
         </button>
       </div>
     </div>
+    </>
   )
 }
