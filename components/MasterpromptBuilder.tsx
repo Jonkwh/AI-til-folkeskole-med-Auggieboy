@@ -24,7 +24,7 @@ const BLOCKS: BlockConfig[] = [
       {
         key: 'role',
         options: [
-          'Sokratisk tutor',
+          'En tutor der stiller spørgsmål',
           'Skrivecoach',
           'Kritisk tænkning-guide',
           'Lektiehjælper',
@@ -45,7 +45,7 @@ const BLOCKS: BlockConfig[] = [
       },
       {
         key: 'subject',
-        options: ['Dansk', 'Engelsk', 'Matematik', 'Historie', 'Naturfag', 'Alle fag'],
+        options: ['Dansk', 'Engelsk', 'Matematik', 'Historie', 'Samfundsfag', 'Naturfag', 'Alle fag'],
       },
     ],
   },
