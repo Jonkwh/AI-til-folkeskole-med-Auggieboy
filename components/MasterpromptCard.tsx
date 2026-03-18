@@ -7,129 +7,157 @@ interface MasterpromptCardProps {
   defaultExpanded: boolean
 }
 
-interface ParsedBlock {
-  label: string
-  value: string
-  sentence: string
-  color: { bg: string; border: string; text: string }
+interface ParsedValues {
+  role: string
+  grade: string
+  subject: string
+  goal: string
+  behaviour: string
+  language: string
+  restriction: string
 }
 
-const BLOCK_COLORS = [
-  { bg: '#CECBF6', border: '#AFA9EC', text: '#5B52C9' },  // Role
-  { bg: '#9FE1CB', border: '#5DCAA5', text: '#1D7A55' },  // Context
-  { bg: '#B5D4F4', border: '#85B7EB', text: '#2563A8' },  // Goal
-  { bg: '#FAC775', border: '#EF9F27', text: '#8B5A00' },  // Behaviour
-  { bg: '#C0DD97', border: '#97C459', text: '#3D6B0F' },  // Language
-  { bg: '#F5C4B3', border: '#F0997B', text: '#B8432A' },  // Restriction
-]
+const CHIP_COLORS = {
+  role:        { bg: '#CECBF6', text: '#534AB7' },
+  context:     { bg: '#9FE1CB', text: '#0F6E56' },
+  goal:        { bg: '#B5D4F4', text: '#185FA5' },
+  behaviour:   { bg: '#FAC775', text: '#854F0B' },
+  language:    { bg: '#C0DD97', text: '#3B6D11' },
+  restriction: { bg: '#F5C4B3', text: '#993C1D' },
+}
 
-function parseMasterprompt(text: string): ParsedBlock[] {
-  const blocks: ParsedBlock[] = []
+const chipStyle = (color: { bg: string; text: string }): React.CSSProperties => ({
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: '2px 8px',
+  borderRadius: '6px',
+  fontWeight: 500,
+  fontSize: '13px',
+  lineHeight: '1.5',
+  backgroundColor: color.bg,
+  color: color.text,
+})
 
-  // Match: "Du er en <value>"
-  const roleMatch = text.match(/Du er en (.+?)(?:\.|$)/m)
+const connectorStyle: React.CSSProperties = {
+  color: '#6b7280',
+  fontSize: '13px',
+  lineHeight: '1.5',
+}
+
+function parseMasterprompt(text: string): ParsedValues | null {
+  // Danish format (primary): "Du er en X. \nfor elever i 8. klasse i Dansk. \n..."
+  const roleMatch = text.match(/Du er en (.+?)(?:\.\s|\.$|$)/m)
+  // Context: match "for elever i <grade> i <subject>" — grade can contain "." (e.g. "8. klasse")
+  const contextMatch = text.match(/for elever i (.+?\s*klasse|.+?\s*klassetrin|Gymnasiet)\s+i\s+(.+?)(?:\.\s|\.$|$)/m)
+  // Fallback: if no "i <subject>" separator, grab the whole thing
+  const contextFallback = !contextMatch ? text.match(/for elever i (.+?)(?:\.\s|\.$|$)/m) : null
+  const goalMatch = text.match(/Dit mål er at (.+?)(?:\.\s|\.$|$)/m)
+  const behaviourMatch = text.match(/Altid (.+?)(?:\.\s|\.$|$)/m)
+  const languageMatch = text.match(/Svar på (.+?)(?:\.\s|\.$|$)/m)
+  const restrictionMatch = text.match(/Aldrig (.+?)(?:\.\s|\.$|$)/m)
+
   if (roleMatch) {
-    blocks.push({ label: 'Rolle', value: roleMatch[1].trim(), sentence: `Du er en ${roleMatch[1].trim()}`, color: BLOCK_COLORS[0] })
+    let grade = ''
+    let subject = ''
+    if (contextMatch) {
+      grade = contextMatch[1].trim()
+      subject = contextMatch[2].trim()
+    } else if (contextFallback) {
+      grade = contextFallback[1].trim()
+    }
+
+    return {
+      role: roleMatch[1].trim(),
+      grade,
+      subject,
+      goal: goalMatch ? goalMatch[1].trim() : '',
+      behaviour: behaviourMatch ? behaviourMatch[1].trim() : '',
+      language: languageMatch ? languageMatch[1].trim() : '',
+      restriction: restrictionMatch ? restrictionMatch[1].trim() : '',
+    }
   }
 
-  // Match: "for elever i <grade> i <subject>"
-  const contextMatch = text.match(/for elever i (.+?)(?:\.|$)/m)
-  if (contextMatch) {
-    blocks.push({ label: 'Kontekst', value: contextMatch[1].trim(), sentence: `for elever i ${contextMatch[1].trim()}`, color: BLOCK_COLORS[1] })
+  // Fallback for English-format masterprompts
+  const roleEn = text.match(/You are a (.+?)(?:\.\s|\.$|$)/m)
+  if (roleEn) {
+    const ctxEn = text.match(/for (.+?) students in (.+?)(?:\.\s|\.$|$)/m)
+    const goalEn = text.match(/Your goal is to (.+?)(?:\.\s|\.$|$)/m)
+    const behEn = text.match(/Always (.+?)(?:\.\s|\.$|$)/m)
+    const langEn = text.match(/Respond in (.+?)(?:\.\s|\.$|$)/m)
+    const restEn = text.match(/Never (.+?)(?:\.\s|\.$|$)/m)
+    return {
+      role: roleEn[1].trim(),
+      grade: ctxEn ? ctxEn[1].trim() : '',
+      subject: ctxEn ? ctxEn[2].trim() : '',
+      goal: goalEn ? goalEn[1].trim() : '',
+      behaviour: behEn ? behEn[1].trim() : '',
+      language: langEn ? langEn[1].trim() : '',
+      restriction: restEn ? restEn[1].trim() : '',
+    }
   }
 
-  // Match: "Dit mål er at <value>"
-  const goalMatch = text.match(/Dit mål er at (.+?)(?:\.|$)/m)
-  if (goalMatch) {
-    blocks.push({ label: 'Mål', value: goalMatch[1].trim(), sentence: `Dit mål er at ${goalMatch[1].trim()}`, color: BLOCK_COLORS[2] })
-  }
-
-  // Match: "Altid <value>"
-  const behaviourMatch = text.match(/Altid (.+?)(?:\.|$)/m)
-  if (behaviourMatch) {
-    blocks.push({ label: 'Adfærd', value: behaviourMatch[1].trim(), sentence: `Altid ${behaviourMatch[1].trim()}`, color: BLOCK_COLORS[3] })
-  }
-
-  // Match: "Svar på <value>"
-  const languageMatch = text.match(/Svar på (.+?)(?:\.|$)/m)
-  if (languageMatch) {
-    blocks.push({ label: 'Sprog', value: languageMatch[1].trim(), sentence: `Svar på ${languageMatch[1].trim()}`, color: BLOCK_COLORS[4] })
-  }
-
-  // Match: "Aldrig <value>"
-  const restrictionMatch = text.match(/Aldrig (.+?)(?:\.|$)/m)
-  if (restrictionMatch) {
-    blocks.push({ label: 'Begrænsning', value: restrictionMatch[1].trim(), sentence: `Aldrig ${restrictionMatch[1].trim()}`, color: BLOCK_COLORS[5] })
-  }
-
-  // Fallback for English-format masterprompts from older sessions
-  if (blocks.length === 0) {
-    const roleEn = text.match(/You are a (.+?)(?:\.|$)/m)
-    if (roleEn) blocks.push({ label: 'Rolle', value: roleEn[1].trim(), sentence: `Du er en ${roleEn[1].trim()}`, color: BLOCK_COLORS[0] })
-
-    const contextEn = text.match(/for (.+?) students in (.+?)(?:\.|$)/m)
-    if (contextEn) blocks.push({ label: 'Kontekst', value: `${contextEn[1].trim()} i ${contextEn[2].trim()}`, sentence: `for elever i ${contextEn[1].trim()} i ${contextEn[2].trim()}`, color: BLOCK_COLORS[1] })
-
-    const goalEn = text.match(/Your goal is to (.+?)(?:\.|$)/m)
-    if (goalEn) blocks.push({ label: 'Mål', value: goalEn[1].trim(), sentence: `Dit mål er at ${goalEn[1].trim()}`, color: BLOCK_COLORS[2] })
-
-    const behaviourEn = text.match(/Always (.+?)(?:\.|$)/m)
-    if (behaviourEn) blocks.push({ label: 'Adfærd', value: behaviourEn[1].trim(), sentence: `Altid ${behaviourEn[1].trim()}`, color: BLOCK_COLORS[3] })
-
-    const languageEn = text.match(/Respond in (.+?)(?:\.|$)/m)
-    if (languageEn) blocks.push({ label: 'Sprog', value: languageEn[1].trim(), sentence: `Svar på ${languageEn[1].trim()}`, color: BLOCK_COLORS[4] })
-
-    const restrictionEn = text.match(/Never (.+?)(?:\.|$)/m)
-    if (restrictionEn) blocks.push({ label: 'Begrænsning', value: restrictionEn[1].trim(), sentence: `Aldrig ${restrictionEn[1].trim()}`, color: BLOCK_COLORS[5] })
-  }
-
-  return blocks
+  return null
 }
 
 export default function MasterpromptCard({ masterprompt, defaultExpanded }: MasterpromptCardProps) {
   const [expanded, setExpanded] = useState(defaultExpanded)
-  const blocks = parseMasterprompt(masterprompt)
+  const parsed = parseMasterprompt(masterprompt)
 
-  if (blocks.length === 0) return null
+  if (!parsed) return null
 
   return (
-    <div style={{ padding: '0 16px', marginTop: '12px', marginBottom: '4px' }}>
+    <div style={{ padding: '0 16px', marginTop: '8px', marginBottom: '4px' }}>
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors mb-2"
+        style={{ fontSize: '12px', color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: '4px' }}
+        onMouseEnter={(e) => (e.currentTarget.style.color = '#6b7280')}
+        onMouseLeave={(e) => (e.currentTarget.style.color = '#9ca3af')}
       >
-        <span>{expanded ? '▲' : '▾'}</span>
-        {expanded ? 'Skjul masterprompt' : 'Vis masterprompt'}
+        {expanded ? '▲ Skjul masterprompt' : '▾ Vis masterprompt'}
       </button>
 
       {expanded && (
         <div style={{
-          borderRadius: '12px',
+          borderRadius: '10px',
           border: '1px solid #e5e7eb',
           backgroundColor: '#ffffff',
-          padding: '12px 16px',
+          padding: '10px 16px',
         }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {blocks.map((block, idx) => (
-              <span
-                key={idx}
-                style={{
-                  display: 'inline-block',
-                  backgroundColor: block.color.bg,
-                  border: `1px solid ${block.color.border}`,
-                  color: '#1f2937',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  padding: '8px 14px',
-                  borderRadius: '8px',
-                  lineHeight: '1.4',
-                  alignSelf: 'flex-start',
-                }}
-              >
-                {block.sentence}
+          <span style={connectorStyle}>Du er en </span>
+          <span style={chipStyle(CHIP_COLORS.role)}>{parsed.role}</span>
+          {parsed.grade && (
+            <>
+              <span style={connectorStyle}> for elever i </span>
+              <span style={chipStyle(CHIP_COLORS.context)}>
+                {parsed.grade}{parsed.subject ? ` i ${parsed.subject}` : ''}
               </span>
-            ))}
-          </div>
+            </>
+          )}
+          {parsed.goal && (
+            <>
+              <span style={connectorStyle}>. Dit mål er at </span>
+              <span style={chipStyle(CHIP_COLORS.goal)}>{parsed.goal}</span>
+            </>
+          )}
+          {parsed.behaviour && (
+            <>
+              <span style={connectorStyle}>. Altid </span>
+              <span style={chipStyle(CHIP_COLORS.behaviour)}>{parsed.behaviour}</span>
+            </>
+          )}
+          {parsed.language && (
+            <>
+              <span style={connectorStyle}>. Svar på </span>
+              <span style={chipStyle(CHIP_COLORS.language)}>{parsed.language}</span>
+            </>
+          )}
+          {parsed.restriction && (
+            <>
+              <span style={connectorStyle}>. Aldrig </span>
+              <span style={chipStyle(CHIP_COLORS.restriction)}>{parsed.restriction}</span>
+            </>
+          )}
+          <span style={connectorStyle}>.</span>
         </div>
       )}
     </div>
