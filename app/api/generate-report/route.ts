@@ -7,65 +7,19 @@ const anthropic = new Anthropic({
 // Claude only generates the OVERSIGT paragraph — all structure is built in code.
 const SYSTEM_PROMPT = `Du er en assistent der hjælper lærere med at forstå, hvordan elever har brugt et AI-værktøj kaldet ThinkBot.
 
-Skriv 3-5 sætninger i klart dansk om hvad eleven arbejdede med og hvilken slags hjælp de bad om. Ingen overskrift, ingen markdown, ingen emojis.`
+Skriv 3-5 sætninger i klart dansk om hvad eleven arbejdede med og hvilken slags hjælp de bad om. Ingen overskrift, ingen markdown, ingen emojis, ingen punktopstillinger — kun løbende tekst.`
 
-// ── ASCII table helpers ───────────────────────────────────────────────
-// Total line width: 74 chars
-// Single-column inner: 70 chars  →  | + sp + 70 + sp + | = 74
-// Two-column inner: left 20, right 47  → | sp 20 sp | sp 47 sp | = 74
+// ── Plain-text formatting helpers ────────────────────────────────────
 
-const W = 70
-const L = 20
-const R = 47
-
-function wrapText(text: string, width: number): string[] {
-  const lines: string[] = []
-  for (const para of text.split('\n')) {
-    const trimmed = para.trim()
-    if (!trimmed) { lines.push(''); continue }
-    const words = trimmed.split(' ')
-    let current = ''
-    for (const word of words) {
-      if (!current) {
-        current = word
-      } else if (current.length + 1 + word.length <= width) {
-        current += ' ' + word
-      } else {
-        lines.push(current)
-        current = word
-      }
-    }
-    if (current) lines.push(current)
-  }
-  return lines.length ? lines : ['']
+function sectionHeading(title: string): string {
+  return `\n\n${title}\n${'-'.repeat(title.length)}\n`
 }
 
-const hFull  = () => '+' + '-'.repeat(W + 2) + '+'
-const hTwo   = () => '+' + '-'.repeat(L + 2) + '+' + '-'.repeat(R + 2) + '+'
-const rFull  = (t: string) => `| ${t.padEnd(W)} |`
-const rStats = (label: string, val: string) => `| ${label.padEnd(L)} | ${val.padEnd(R)} |`
-const rCentered = (t: string) => {
-  const pad = Math.max(0, Math.floor((W - t.length) / 2))
-  return `| ${' '.repeat(pad)}${t.padEnd(W - pad)} |`
+function dotLeader(label: string, value: string, col = 40): string {
+  // e.g. "Dato ............................ 18. marts 2026"
+  const dots = '.'.repeat(Math.max(1, col - label.length - 2))
+  return `${label} ${dots} ${value}`
 }
-
-function sectionBlock(title: string, body: string): string[] {
-  const rows = wrapText(body, W).map(rFull)
-  return [hFull(), rFull(title), hFull(), ...rows]
-}
-
-function chatBlock(conversation: string): string[] {
-  const rows: string[] = []
-  for (const msg of conversation.split('\n\n')) {
-    for (const line of wrapText(msg, W)) {
-      rows.push(rFull(line))
-    }
-    rows.push(rFull(''))  // blank separator between messages
-  }
-  return rows
-}
-
-// ── Formatting helpers ────────────────────────────────────────────────
 
 function formatDate(iso: string | undefined): string {
   if (!iso) return '-'
@@ -98,7 +52,7 @@ export async function POST(req: Request) {
       .map((m) => `${m.role === 'user' ? '[Elev]' : '[ThinkBot]'}: ${m.content}`)
       .join('\n\n')
 
-    // Ask Claude for analysis only
+    // Ask Claude for the OVERSIGT paragraph only
     const aiResponse = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 2048,
@@ -113,23 +67,30 @@ export async function POST(req: Request) {
 
     const oversigt = aiResponse.content[0].type === 'text' ? aiResponse.content[0].text.trim() : ''
 
-    // Build the report as an ASCII matrix
-    const lines: string[] = [
-      hFull(),
-      rCentered('THINKBOT SAMTALEEKSPORT'),
-      ...sectionBlock('OVERSIGT', oversigt),
-      hTwo(),
-      rStats('Dato',          date),
-      rStats('Elevbeskeder',  String(userCount)),
-      rStats('ThinkBot-svar', String(botCount)),
-      hFull(),
-      rFull('FULD SAMTALE'),
-      hFull(),
-      ...chatBlock(conversation),
-      hFull(),
-    ]
+    // Build the full chat block: speaker label on one line, content on the next
+    const chatLines = allMessages
+      .map((m) => {
+        const label = m.role === 'user' ? '[Elev]' : '[ThinkBot]'
+        return `${label}\n${m.content}`
+      })
+      .join('\n\n')
 
-    return new Response(lines.join('\n'), {
+    // Assemble the report
+    const report = [
+      'THINKBOT SAMTALEEKSPORT',
+      '-'.repeat('THINKBOT SAMTALEEKSPORT'.length),
+      date,
+      sectionHeading('OVERSIGT'),
+      oversigt,
+      sectionHeading('SAMTALESTATISTIK'),
+      dotLeader('Dato',          date),
+      dotLeader('Elevbeskeder',  String(userCount)),
+      dotLeader('ThinkBot-svar', String(botCount)),
+      sectionHeading('FULD SAMTALE'),
+      chatLines,
+    ].join('\n')
+
+    return new Response(report, {
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     })
   } catch (error) {
