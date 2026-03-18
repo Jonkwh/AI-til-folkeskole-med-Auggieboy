@@ -9,6 +9,7 @@ export default function LoginForm() {
   const supabase = createClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -17,6 +18,12 @@ export default function LoginForm() {
     e.preventDefault()
     setError('')
     setLoading(true)
+
+    if (isSignUp && password !== confirmPassword) {
+      setError('Adgangskoderne stemmer ikke overens')
+      setLoading(false)
+      return
+    }
 
     try {
       if (isSignUp) {
@@ -86,6 +93,28 @@ export default function LoginForm() {
               />
             </div>
 
+            {isSignUp && (
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                  Gentag adgangskode
+                </label>
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent"
+                  placeholder="Gentag din adgangskode"
+                />
+                {confirmPassword && (
+                  <p className={`text-sm mt-1 ${password === confirmPassword ? 'text-green-600' : 'text-red-600'}`}>
+                    {password === confirmPassword ? 'Adgangskoderne matcher' : 'Adgangskoderne stemmer ikke overens'}
+                  </p>
+                )}
+              </div>
+            )}
+
             {error && (
               <p className={`text-sm ${error.includes('Tjek din email') ? 'text-green-600' : 'text-red-600'}`}>
                 {error}
@@ -106,6 +135,7 @@ export default function LoginForm() {
               onClick={() => {
                 setIsSignUp(!isSignUp)
                 setError('')
+                setConfirmPassword('')
               }}
               className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
             >
