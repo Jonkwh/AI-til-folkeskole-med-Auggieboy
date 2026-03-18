@@ -74,12 +74,12 @@ export default function ChatInterface({
       updateSessionTitle(userMessage)
     }
 
-    const newUserMsg: Message = { role: 'user', content: userMessage }
+    const newUserMsg: Message = { role: 'user', content: userMessage, created_at: new Date().toISOString() }
     setMessages((prev) => [...prev, newUserMsg])
     await saveMessage('user', userMessage)
 
     setIsStreaming(true)
-    const assistantMsg: Message = { role: 'assistant', content: '' }
+    const assistantMsg: Message = { role: 'assistant', content: '', created_at: new Date().toISOString() }
     setMessages((prev) => [...prev, assistantMsg])
 
     try {

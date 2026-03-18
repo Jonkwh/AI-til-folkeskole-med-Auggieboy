@@ -5,6 +5,7 @@ import { useState } from 'react'
 interface Message {
   role: 'user' | 'assistant'
   content: string
+  created_at?: string
 }
 
 interface ShareButtonProps {

@@ -6,32 +6,41 @@ const anthropic = new Anthropic({
 
 const SYSTEM_PROMPT = `Du er en assistent der hjælper lærere med at forstå, hvordan elever har brugt et AI-værktøj kaldet ThinkBot. Du modtager en samtale mellem en elev og ThinkBot, samt den masterprompt der styrede AI'ens adfærd.
 
-Generer en struktureret rapport i dansk. Rapporten skal være i ren tekst (ikke markdown, ikke JSON) og skal passe ind direkte i et Word-dokument eller Google Doc.
+Generer en rapport i dansk formateret som en to-kolonne tekst-tabel. Brug dette præcise format for hver række (adskil kolonner med en tabulator):
 
-Rapporten skal have følgende sektioner i denne rækkefølge:
+KATEGORI	INDHOLD
 
-📋 OVERSIGT
-Skriv 3-5 sætninger der sammenfatter hvad eleven arbejdede med, og hvilken slags hjælp de bad om.
+Tabellen skal indeholde følgende rækker i denne rækkefølge:
 
-📊 SAMTALESTATISTIK
-Angiv:
-- Antal elevbeskeder: [tal]
-- Antal ThinkBot-svar: [tal]
-- Stillede eleven opfølgende spørgsmål der byggede videre på tidligere svar? Ja/Nej — skriv en kort forklaring.
+Dato	[dato for samtalen]
+Starttidspunkt	[tidspunkt for elevens første besked]
+Sluttidspunkt	[tidspunkt for elevens sidste besked]
+Elevbeskeder	[antal]
+ThinkBot-svar	[antal]
+Opfølgende spørgsmål	[Ja/Nej — kort forklaring]
+Oversigt	[3-5 sætninger om hvad eleven arbejdede med og hvilken hjælp de bad om]
+Kritisk tænkning	[kort vurdering: satte eleven spørgsmålstegn ved svar, omformulerede eller gravede dybere? Eller kopierede de primært det første svar?]
+Eksempel-prompts	[3-5 af elevens mest repræsentative beskeder, adskilt med | tegnet]
 
-🧠 KRITISK TÆNKNING
-Kort vurdering af om eleven viste selvstændig tænkning: satte de spørgsmålstegn ved svar, omformulerede, eller gravede dybere? Eller kopierede de primært det første svar?
+Vigtigt:
+- Brug ingen markdown-formatering som **, *, # eller lignende
+- Brug ingen emojis
+- Hold indholdet i hver celle kortfattet og konkret
+- Eksempel-prompts skal være ordret citerede fra samtalen`
 
-⚠️ MULIG SNYD
-Marker eventuelle elevbeskeder eller AI-svar der tyder på, at eleven bad AI'en skrive noget direkte for dem (f.eks. "skriv mit afsnit", "lav min konklusion", "giv mig svaret"). Citér den/de præcise besked(er) hvis fundet. Skriv "Ingen mistænkelige mønstre fundet." hvis intet mistænkeligt.
+function formatTime(iso: string | undefined, locale: string): string {
+  if (!iso) return '–'
+  return new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
+}
 
-💬 EKSEMPLER PÅ ELEVENS PROMPTS
-Vis 3-5 af de mest repræsentative elevbeskeder (ordret citat) så læreren kan fornemme, hvordan eleven brugte værktøjet.
-
-📝 FULD SAMTALE
-Den fulde samtale formateret med [Elev]: og [ThinkBot]: labels og en tom linje mellem hver besked.
-
-Vigtigt: Brug ingen markdown-formatering som **, *, # eller lignende. Brug kun de emoji-ikoner angivet ovenfor som sektionsoverskrifter.`
+function formatDate(iso: string | undefined, locale: string): string {
+  if (!iso) return '–'
+  return new Date(iso).toLocaleDateString(locale, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+}
 
 export async function POST(req: Request) {
   try {
@@ -41,13 +50,13 @@ export async function POST(req: Request) {
       return new Response('Missing messages or masterprompt', { status: 400 })
     }
 
-    const date = new Date().toLocaleDateString('da-DK', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+    const userMessages = messages.filter((m: { role: string }) => m.role === 'user')
+    const firstUserMsg = userMessages[0]
+    const lastUserMsg = userMessages[userMessages.length - 1]
+
+    const date = formatDate(firstUserMsg?.created_at, 'da-DK')
+    const startTime = formatTime(firstUserMsg?.created_at, 'da-DK')
+    const endTime = formatTime(lastUserMsg?.created_at, 'da-DK')
 
     const conversation = messages
       .map((m: { role: string; content: string }) => {
@@ -56,7 +65,9 @@ export async function POST(req: Request) {
       })
       .join('\n\n')
 
-    const userMessage = `Dato for samtale: ${date}
+    const userMessage = `Dato: ${date}
+Starttidspunkt for elevens første besked: ${startTime}
+Sluttidspunkt for elevens sidste besked: ${endTime}
 
 Masterprompt brugt i denne session:
 ${masterprompt}
@@ -66,7 +77,7 @@ ${conversation}`
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
+      max_tokens: 2048,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userMessage }],
     })
