@@ -26,9 +26,9 @@ const BLOCKS: BlockConfig[] = [
         options: [
           'En tutor der stiller spørgsmål',
           'Skrivecoach',
-          'Kritisk tænkning-guide',
+          'Start-hjælper',
           'Lektiehjælper',
-          'Fagspecialist',
+          'Ekspert',
         ],
       },
     ],
@@ -36,7 +36,7 @@ const BLOCKS: BlockConfig[] = [
   {
     label: 'KONTEKST',
     prefix: 'for elever i ',
-    suffix: '',
+    suffix: ' i en dansk skole',
     color: { bg: '#9FE1CB', border: '#5DCAA5', text: '#1D7A55' },
     dropdowns: [
       {
@@ -76,7 +76,6 @@ const BLOCKS: BlockConfig[] = [
           'Stil guidende spørgsmål i stedet for at give direkte svar',
           'Få eleven til at reflektere før du svarer',
           'Opdel komplekse problemer i mindre trin',
-          'Anerkend elevens indsats og ræsonnement',
         ],
       },
     ],
@@ -92,7 +91,6 @@ const BLOCKS: BlockConfig[] = [
           'Samme sprog som eleven bruger',
           'Dansk',
           'Engelsk',
-          'Simpelt aldersvarende sprog',
         ],
       },
     ],
@@ -136,7 +134,7 @@ export default function MasterpromptBuilder() {
   function assemblePrompt(): string {
     const lines = [
       `Du er en ${selections.role}`,
-      `for elever i ${selections.grade} i ${selections.subject}`,
+      `for elever i ${selections.grade} i ${selections.subject} i en dansk skole`,
       `Dit mål er at ${selections.goal.toLowerCase()}.`,
       `Altid ${selections.behaviour.toLowerCase()}.`,
       `Svar på ${selections.language.toLowerCase()}.`,
@@ -242,6 +240,9 @@ export default function MasterpromptBuilder() {
                       </select>
                     </span>
                   ))}
+                  {block.suffix && (
+                    <span className="text-sm font-medium text-gray-800">{block.suffix}</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -268,7 +269,7 @@ export default function MasterpromptBuilder() {
                   className="rounded px-1.5 py-0.5 font-medium"
                   style={{ backgroundColor: BLOCKS[1].color.bg }}
                 >
-                  for elever i {selections.grade} i {selections.subject}
+                  for elever i {selections.grade} i {selections.subject} i en dansk skole
                 </span>
               </p>
               <p>

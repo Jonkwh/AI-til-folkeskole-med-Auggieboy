@@ -48,8 +48,14 @@ export async function POST(req: Request) {
         'Cache-Control': 'no-cache',
       },
     })
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Chat API error:', error)
+
+    // Forward Anthropic rate limit errors as 429
+    if (error instanceof Anthropic.RateLimitError) {
+      return new Response('Rate limited', { status: 429 })
+    }
+
     return new Response('Internal server error', { status: 500 })
   }
 }

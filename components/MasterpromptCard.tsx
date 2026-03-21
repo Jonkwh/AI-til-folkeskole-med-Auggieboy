@@ -11,6 +11,7 @@ interface ParsedValues {
   role: string
   grade: string
   subject: string
+  hasDanskSkole: boolean
   goal: string
   behaviour: string
   language: string
@@ -47,8 +48,8 @@ const connectorStyle: React.CSSProperties = {
 function parseMasterprompt(text: string): ParsedValues | null {
   // Danish format (primary): "Du er en X. \nfor elever i 8. klasse i Dansk. \n..."
   const roleMatch = text.match(/Du er en (.+?)(?:\.\s|\.$|$)/m)
-  // Context: match "for elever i <grade> i <subject>" — grade can contain "." (e.g. "8. klasse")
-  const contextMatch = text.match(/for elever i (.+?\s*klasse|.+?\s*klassetrin|Gymnasiet)\s+i\s+(.+?)(?:\.\s|\.$|$)/m)
+  // Context: match "for elever i <grade> i <subject> [i en dansk skole]" — grade can contain "." (e.g. "8. klasse")
+  const contextMatch = text.match(/for elever i (.+?\s*klasse|.+?\s*klassetrin|Gymnasiet)\s+i\s+(.+?)(?:\s+i en dansk skole)?(?:\.\s|\.$|$)/m)
   // Fallback: if no "i <subject>" separator, grab the whole thing
   const contextFallback = !contextMatch ? text.match(/for elever i (.+?)(?:\.\s|\.$|$)/m) : null
   const goalMatch = text.match(/Dit mål er at (.+?)(?:\.\s|\.$|$)/m)
@@ -70,6 +71,7 @@ function parseMasterprompt(text: string): ParsedValues | null {
       role: roleMatch[1].trim(),
       grade,
       subject,
+      hasDanskSkole: text.includes('i en dansk skole'),
       goal: goalMatch ? goalMatch[1].trim() : '',
       behaviour: behaviourMatch ? behaviourMatch[1].trim() : '',
       language: languageMatch ? languageMatch[1].trim() : '',
@@ -89,6 +91,7 @@ function parseMasterprompt(text: string): ParsedValues | null {
       role: roleEn[1].trim(),
       grade: ctxEn ? ctxEn[1].trim() : '',
       subject: ctxEn ? ctxEn[2].trim() : '',
+      hasDanskSkole: false,
       goal: goalEn ? goalEn[1].trim() : '',
       behaviour: behEn ? behEn[1].trim() : '',
       language: langEn ? langEn[1].trim() : '',
@@ -131,6 +134,9 @@ export default function MasterpromptCard({ masterprompt, defaultExpanded }: Mast
               <span style={chipStyle(CHIP_COLORS.context)}>
                 {parsed.grade}{parsed.subject ? ` i ${parsed.subject}` : ''}
               </span>
+              {parsed.hasDanskSkole && (
+                <span style={connectorStyle}> i en dansk skole</span>
+              )}
             </>
           )}
           {parsed.goal && (

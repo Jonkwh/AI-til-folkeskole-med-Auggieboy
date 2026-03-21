@@ -10,6 +10,7 @@ interface Message {
   role: 'user' | 'assistant'
   content: string
   created_at?: string
+  isError?: boolean
 }
 
 interface ChatInterfaceProps {
@@ -18,6 +19,9 @@ interface ChatInterfaceProps {
   initialMessages: Message[]
   sessionTitle: string
 }
+
+const RATE_LIMIT_WINDOW = 10_000 // 10 seconds
+const RATE_LIMIT_MAX = 5
 
 export default function ChatInterface({
   sessionId,
@@ -30,8 +34,10 @@ export default function ChatInterface({
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
   const [title, setTitle] = useState(sessionTitle)
+  const [rateLimited, setRateLimited] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const messageTimestamps = useRef<number[]>([])
   const isNewChat = initialMessages.length === 0
 
   useEffect(() => {
@@ -44,6 +50,29 @@ export default function ChatInterface({
       textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 150) + 'px'
     }
   }, [input])
+
+  function checkRateLimit(): boolean {
+    const now = Date.now()
+    // Remove timestamps outside the window
+    messageTimestamps.current = messageTimestamps.current.filter(
+      (t) => now - t < RATE_LIMIT_WINDOW
+    )
+    if (messageTimestamps.current.length >= RATE_LIMIT_MAX) {
+      setRateLimited(true)
+      // Auto-clear when the oldest message in the window expires
+      const oldest = messageTimestamps.current[0]
+      const delay = RATE_LIMIT_WINDOW - (now - oldest) + 100
+      setTimeout(() => {
+        messageTimestamps.current = messageTimestamps.current.filter(
+          (t) => Date.now() - t < RATE_LIMIT_WINDOW
+        )
+        setRateLimited(false)
+      }, delay)
+      return false
+    }
+    messageTimestamps.current.push(now)
+    return true
+  }
 
   async function updateSessionTitle(firstMessage: string) {
     const newTitle = firstMessage.slice(0, 40) + (firstMessage.length > 40 ? '...' : '')
@@ -64,10 +93,11 @@ export default function ChatInterface({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!input.trim() || isStreaming) return
+    if (!input.trim() || isStreaming || rateLimited) return
+
+    if (!checkRateLimit()) return
 
     const userMessage = input.trim()
-    setInput('')
 
     // Update title from first user message
     if (messages.length === 0) {
@@ -79,6 +109,8 @@ export default function ChatInterface({
     await saveMessage('user', userMessage)
 
     setIsStreaming(true)
+    // Clear input only after we know we're sending
+    setInput('')
     const assistantMsg: Message = { role: 'assistant', content: '', created_at: new Date().toISOString() }
     setMessages((prev) => [...prev, assistantMsg])
 
@@ -97,7 +129,31 @@ export default function ChatInterface({
         }),
       })
 
-      if (!response.ok) throw new Error('Chat API request failed')
+      if (!response.ok) {
+        const status = response.status
+        console.error(`Chat API returned ${status}`)
+
+        let errorMessage: string
+        if (status === 429) {
+          errorMessage = 'ThinkBot er lidt overbelastet lige nu. Vent et øjeblik og prøv igen 🙂'
+        } else {
+          errorMessage = 'Noget gik galt. Prøv at sende din besked igen.'
+        }
+
+        // Put the user's message back in the input so they can resend
+        setInput(userMessage)
+        setMessages((prev) => {
+          const updated = [...prev]
+          updated[updated.length - 1] = {
+            role: 'assistant',
+            content: errorMessage,
+            isError: true,
+          }
+          return updated
+        })
+        setIsStreaming(false)
+        return
+      }
 
       const reader = response.body?.getReader()
       const decoder = new TextDecoder()
@@ -120,11 +176,14 @@ export default function ChatInterface({
       await saveMessage('assistant', fullContent)
     } catch (err) {
       console.error('Streaming error:', err)
+      // Put the user's message back in the input so they can resend
+      setInput(userMessage)
       setMessages((prev) => {
         const updated = [...prev]
         updated[updated.length - 1] = {
           role: 'assistant',
-          content: 'Beklager, noget gik galt. Prøv venligst igen.',
+          content: 'Det ser ud til, at forbindelsen blev afbrudt. Tjek din internetforbindelse og prøv igen.',
+          isError: true,
         }
         return updated
       })
@@ -139,6 +198,8 @@ export default function ChatInterface({
       handleSubmit(e)
     }
   }
+
+  const sendDisabled = !input.trim() || isStreaming || rateLimited
 
   return (
     <div className="flex flex-col h-full">
@@ -182,13 +243,20 @@ export default function ChatInterface({
           >
             <div
               className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                msg.role === 'user'
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-800'
+                msg.isError
+                  ? ''
+                  : msg.role === 'user'
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-800'
               }`}
+              style={
+                msg.isError
+                  ? { backgroundColor: '#F5C4B3', color: '#993C1D' }
+                  : undefined
+              }
             >
               <div className="whitespace-pre-wrap">{msg.content}</div>
-              {msg.role === 'assistant' && isStreaming && idx === messages.length - 1 && (
+              {msg.role === 'assistant' && isStreaming && idx === messages.length - 1 && !msg.isError && (
                 <span className="inline-block w-1.5 h-4 bg-gray-400 animate-pulse ml-0.5" />
               )}
             </div>
@@ -211,12 +279,17 @@ export default function ChatInterface({
           />
           <button
             type="submit"
-            disabled={!input.trim() || isStreaming}
+            disabled={sendDisabled}
             className="px-5 py-3 rounded-xl bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Send
           </button>
         </form>
+        {rateLimited && (
+          <p className="text-xs mt-2" style={{ color: '#854F0B' }}>
+            Vent et øjeblik, før du sender din næste besked 🙂
+          </p>
+        )}
       </div>
     </div>
   )
