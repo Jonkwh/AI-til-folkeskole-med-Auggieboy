@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { createClient } from '@/lib/supabase'
 import ShareButton from './ShareButton'
 import MasterpromptCard from './MasterpromptCard'
@@ -23,6 +24,16 @@ interface ChatInterfaceProps {
 const RATE_LIMIT_WINDOW = 10_000 // 10 seconds
 const RATE_LIMIT_MAX = 5
 
+const ASSIGNMENT_PATTERNS = [
+  /skriv\s+(min|en|et|din)\s+(opgave|stil|afsnit|indledning|konklusion|besvarelse)/i,
+  /skriv\s+opgaven/i,
+  /lav\s+(min|en|et|din)\s+(opgave|stil|afsnit|indledning|konklusion|besvarelse)/i,
+  /lav\s+opgaven/i,
+  /kan\s+du\s+(skrive|lave)/i,
+  /færdiggør\s+min/i,
+  /afslut\s+min/i,
+]
+
 export default function ChatInterface({
   sessionId,
   masterprompt,
@@ -35,6 +46,7 @@ export default function ChatInterface({
   const [isStreaming, setIsStreaming] = useState(false)
   const [title, setTitle] = useState(sessionTitle)
   const [rateLimited, setRateLimited] = useState(false)
+  const [assignmentBlocked, setAssignmentBlocked] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messageTimestamps = useRef<number[]>([])
@@ -93,11 +105,17 @@ export default function ChatInterface({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!input.trim() || isStreaming || rateLimited) return
+    if (!input.trim() || isStreaming || rateLimited || assignmentBlocked) return
 
     if (!checkRateLimit()) return
 
     const userMessage = input.trim()
+
+    // Client-side guardrail: check for assignment writing requests
+    if (ASSIGNMENT_PATTERNS.some((p) => p.test(userMessage))) {
+      setAssignmentBlocked(true)
+      return
+    }
 
     // Update title from first user message
     if (messages.length === 0) {
@@ -255,7 +273,25 @@ export default function ChatInterface({
                   : undefined
               }
             >
-              <div className="whitespace-pre-wrap">{msg.content}</div>
+              {msg.role === 'assistant' && !msg.isError ? (
+                <div className="markdown-content" style={{ overflow: 'hidden' }}>
+                  <ReactMarkdown
+                    components={{
+                      h2: ({ children }) => <h2 style={{ fontWeight: 500, fontSize: '1.05em', marginTop: 12, marginBottom: 4 }}>{children}</h2>,
+                      h3: ({ children }) => <h3 style={{ fontWeight: 500, fontSize: '1em', marginTop: 12, marginBottom: 4 }}>{children}</h3>,
+                      p: ({ children }) => <p style={{ marginBottom: 8 }}>{children}</p>,
+                      strong: ({ children }) => <strong style={{ fontWeight: 500 }}>{children}</strong>,
+                      ul: ({ children }) => <ul style={{ paddingLeft: 16, listStyleType: 'disc', marginBottom: 8 }}>{children}</ul>,
+                      ol: ({ children }) => <ol style={{ paddingLeft: 16, listStyleType: 'decimal', marginBottom: 8 }}>{children}</ol>,
+                      li: ({ children }) => <li style={{ marginBottom: 4 }}>{children}</li>,
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
+                </div>
+              ) : (
+                <div className="whitespace-pre-wrap">{msg.content}</div>
+              )}
               {msg.role === 'assistant' && isStreaming && idx === messages.length - 1 && !msg.isError && (
                 <span className="inline-block w-1.5 h-4 bg-gray-400 animate-pulse ml-0.5" />
               )}
@@ -271,7 +307,7 @@ export default function ChatInterface({
           <textarea
             ref={textareaRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => { setInput(e.target.value); setAssignmentBlocked(false) }}
             onKeyDown={handleKeyDown}
             placeholder="Skriv din besked..."
             rows={1}
@@ -288,6 +324,11 @@ export default function ChatInterface({
         {rateLimited && (
           <p className="text-xs mt-2" style={{ color: '#854F0B' }}>
             Vent et øjeblik, før du sender din næste besked 🙂
+          </p>
+        )}
+        {assignmentBlocked && (
+          <p className="text-xs mt-2" style={{ color: '#854F0B' }}>
+            ThinkBot skriver ikke opgaver, men hjælper dig gerne med at komme i gang 🙂 Prøv at fortælle, hvad du er gået i stå med.
           </p>
         )}
       </div>
