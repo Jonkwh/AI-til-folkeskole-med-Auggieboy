@@ -3,12 +3,61 @@
 @tailwind utilities;
 
 :root {
-  --bg-app:     #f9f9f7;
-  --bg-surface: #f4f3ef;
-  --bg-panel:   #efeee8;
-  --bg-card:    #eae8e0;
-  --bg-input:   #eae8e0;
-  --border:     #e5e3d9;
+  /** Base colors */
+  --clr-dark-a0: #000000;
+  --clr-light-a0: #ffffff;
+
+  /** Theme primary colors */
+  --clr-primary-a0: #000000;
+  --clr-primary-a10: #000000;
+  --clr-primary-a20: #000000;
+  --clr-primary-a30: #000000;
+  --clr-primary-a40: #000000;
+  --clr-primary-a50: #000000;
+
+  /** Theme surface colors */
+  --clr-surface-a0: #ffffff;
+  --clr-surface-a10: #f0f0f0;
+  --clr-surface-a20: #e1e1e1;
+  --clr-surface-a30: #d3d3d3;
+  --clr-surface-a40: #c5c5c5;
+  --clr-surface-a50: #b6b6b6;
+
+  /** Theme tonal surface colors */
+  --clr-surface-tonal-a0: #e2e2e2;
+  --clr-surface-tonal-a10: #d7d7d7;
+  --clr-surface-tonal-a20: #cbcbcb;
+  --clr-surface-tonal-a30: #c0c0c0;
+  --clr-surface-tonal-a40: #b5b5b5;
+  --clr-surface-tonal-a50: #aaaaaa;
+
+  /** Success colors */
+  --clr-success-a0: #1b7f5c;
+  --clr-success-a10: #28be8a;
+  --clr-success-a20: #58dbad;
+
+  /** Warning colors */
+  --clr-warning-a0: #b8871f;
+  --clr-warning-a10: #dfae44;
+  --clr-warning-a20: #ebca85;
+
+  /** Danger colors */
+  --clr-danger-a0: #b13535;
+  --clr-danger-a10: #d06262;
+  --clr-danger-a20: #e29d9d;
+
+  /** Info colors */
+  --clr-info-a0: #1e56a3;
+  --clr-info-a10: #347ada;
+  --clr-info-a20: #74a4e6;
+
+  /** App semantic mappings */
+  --bg-app:     var(--clr-surface-a0);
+  --bg-surface: var(--clr-surface-a10);
+  --bg-panel:   var(--clr-surface-a20);
+  --bg-card:    var(--clr-surface-tonal-a0);
+  --bg-input:   var(--clr-surface-a10);
+  --border:     var(--clr-surface-a30);
 }
 
 .dark {
