@@ -222,14 +222,14 @@ export default function ChatInterface({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-white">
+      <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--border)] bg-[var(--bg-surface)]">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center">
             <span className="text-white text-xs font-bold">TB</span>
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-gray-900 truncate max-w-xs">{title}</h2>
-            <p className="text-xs text-gray-400">ThinkBot</p>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate max-w-xs">{title}</h2>
+            <p className="text-xs text-gray-400 dark:text-gray-500">ThinkBot</p>
           </div>
         </div>
         <ShareButton messages={messages} masterprompt={masterprompt} />
@@ -243,11 +243,11 @@ export default function ChatInterface({
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl text-gray-400">TB</span>
+              <div className="w-16 h-16 rounded-full bg-[var(--bg-card)] flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl text-gray-400 dark:text-gray-500">TB</span>
               </div>
-              <h3 className="text-lg font-medium text-gray-700">Start en samtale</h3>
-              <p className="text-sm text-gray-400 mt-1">
+              <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300">Start en samtale</h3>
+              <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
                 Din masterprompt er klar. Skriv din første besked nedenfor.
               </p>
             </div>
@@ -265,7 +265,7 @@ export default function ChatInterface({
                   ? ''
                   : msg.role === 'user'
                     ? 'bg-gray-900 text-white'
-                    : 'bg-gray-100 text-gray-800'
+                    : 'bg-[var(--bg-panel)] text-gray-800 dark:text-gray-200'
               }`}
               style={
                 msg.isError
@@ -302,7 +302,7 @@ export default function ChatInterface({
       </div>
 
       {/* Input */}
-      <div className="px-6 py-4 border-t border-gray-200 bg-white">
+      <div className="px-6 py-4 border-t border-[var(--border)] bg-[var(--bg-surface)]">
         <form onSubmit={handleSubmit} className="flex items-end gap-3">
           <textarea
             ref={textareaRef}
@@ -311,7 +311,7 @@ export default function ChatInterface({
             onKeyDown={handleKeyDown}
             placeholder="Skriv din besked..."
             rows={1}
-            className="flex-1 resize-none rounded-xl border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent"
+            className="flex-1 resize-none rounded-xl border border-[var(--border)] bg-[var(--bg-input)] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600 focus:border-transparent"
           />
           <button
             type="submit"

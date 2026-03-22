@@ -2,6 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg-app:     #f9f9f7;
+  --bg-surface: #f4f3ef;
+  --bg-panel:   #efeee8;
+  --bg-card:    #eae8e0;
+  --bg-input:   #eae8e0;
+  --border:     #e5e3d9;
+}
+
+.dark {
+  --bg-app:     #1e1e1e;
+  --bg-surface: #252526;
+  --bg-panel:   #2d2d30;
+  --bg-card:    #2d2d30;
+  --bg-input:   #3e3e42;
+  --border:     #3e3e42;
+}
+
 @layer utilities {
   @keyframes fade-in {
     from {

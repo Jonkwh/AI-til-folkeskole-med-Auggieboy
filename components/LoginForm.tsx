@@ -44,26 +44,26 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--bg-app)] px-4">
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-gray-900 flex items-center justify-center mx-auto mb-4">
             <span className="text-white text-xl font-bold">TB</span>
           </div>
-          <h1 className="text-2xl font-semibold text-gray-900">ThinkBot</h1>
-          <p className="text-sm text-gray-500 mt-1">AI til kritisk tænkning</p>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">ThinkBot</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">AI til kritisk tænkning</p>
         </div>
 
         {/* Form */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">
+        <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] p-6 shadow-sm">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
             {isSignUp ? 'Opret en konto' : 'Log ind'}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Email
               </label>
               <input
@@ -72,13 +72,13 @@ export default function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent"
+                className="w-full px-3 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600 focus:border-transparent"
                 placeholder="dig@skole.dk"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Adgangskode
               </label>
               <input
@@ -88,14 +88,14 @@ export default function LoginForm() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
-                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent"
+                className="w-full px-3 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600 focus:border-transparent"
                 placeholder="Min. 6 tegn"
               />
             </div>
 
             {isSignUp && (
               <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Gentag adgangskode
                 </label>
                 <input
@@ -104,7 +104,7 @@ export default function LoginForm() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent"
+                  className="w-full px-3 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600 focus:border-transparent"
                   placeholder="Gentag din adgangskode"
                 />
                 {confirmPassword && (
@@ -137,7 +137,7 @@ export default function LoginForm() {
                 setError('')
                 setConfirmPassword('')
               }}
-              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
             >
               {isSignUp ? 'Har du allerede en konto? Log ind' : 'Har du ikke en konto? Opret en'}
             </button>

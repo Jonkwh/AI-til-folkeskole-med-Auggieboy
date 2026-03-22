@@ -47,7 +47,7 @@ export default function ShareButton({ messages, masterprompt }: ShareButtonProps
       <button
         onClick={handleShare}
         disabled={messages.length === 0 || loading}
-        className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] text-gray-600 dark:text-gray-400 hover:bg-[var(--bg-panel)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {loading ? (
           <span className="flex items-center gap-2">

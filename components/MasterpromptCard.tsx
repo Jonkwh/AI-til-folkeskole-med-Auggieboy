@@ -39,11 +39,7 @@ const chipStyle = (color: { bg: string; text: string }): React.CSSProperties => 
   color: color.text,
 })
 
-const connectorStyle: React.CSSProperties = {
-  color: '#6b7280',
-  fontSize: '13px',
-  lineHeight: '1.5',
-}
+const connectorClass = 'text-gray-500 dark:text-gray-400 text-[13px] leading-[1.5]'
 
 function parseMasterprompt(text: string): ParsedValues | null {
   // Danish format (primary): "Du er en X. \nfor elever i 8. klasse i Dansk. \n..."
@@ -112,58 +108,51 @@ export default function MasterpromptCard({ masterprompt, defaultExpanded }: Mast
     <div style={{ padding: '0 16px', marginTop: '8px', marginBottom: '4px' }}>
       <button
         onClick={() => setExpanded(!expanded)}
-        style={{ fontSize: '12px', color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: '4px' }}
-        onMouseEnter={(e) => (e.currentTarget.style.color = '#6b7280')}
-        onMouseLeave={(e) => (e.currentTarget.style.color = '#9ca3af')}
+        className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400 bg-none border-none cursor-pointer p-0 mb-1 transition-colors"
       >
         {expanded ? '▲ Skjul masterprompt' : '▾ Vis masterprompt'}
       </button>
 
       {expanded && (
-        <div style={{
-          borderRadius: '10px',
-          border: '1px solid #e5e7eb',
-          backgroundColor: '#ffffff',
-          padding: '10px 16px',
-        }}>
-          <span style={connectorStyle}>Du er en </span>
+        <div className="rounded-[10px] border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2.5">
+          <span className={connectorClass}>Du er en </span>
           <span style={chipStyle(CHIP_COLORS.role)}>{parsed.role}</span>
           {parsed.grade && (
             <>
-              <span style={connectorStyle}> for elever i </span>
+              <span className={connectorClass}> for elever i </span>
               <span style={chipStyle(CHIP_COLORS.context)}>
                 {parsed.grade}{parsed.subject ? ` i ${parsed.subject}` : ''}
               </span>
               {parsed.hasDanskSkole && (
-                <span style={connectorStyle}> i en dansk skole</span>
+                <span className={connectorClass}> i en dansk skole</span>
               )}
             </>
           )}
           {parsed.goal && (
             <>
-              <span style={connectorStyle}>. Dit mål er at </span>
+              <span className={connectorClass}>. Dit mål er at </span>
               <span style={chipStyle(CHIP_COLORS.goal)}>{parsed.goal}</span>
             </>
           )}
           {parsed.behaviour && (
             <>
-              <span style={connectorStyle}>. Altid </span>
+              <span className={connectorClass}>. Altid </span>
               <span style={chipStyle(CHIP_COLORS.behaviour)}>{parsed.behaviour}</span>
             </>
           )}
           {parsed.language && (
             <>
-              <span style={connectorStyle}>. Svar på </span>
+              <span className={connectorClass}>. Svar på </span>
               <span style={chipStyle(CHIP_COLORS.language)}>{parsed.language}</span>
             </>
           )}
           {parsed.restriction && (
             <>
-              <span style={connectorStyle}>. Aldrig </span>
+              <span className={connectorClass}>. Aldrig </span>
               <span style={chipStyle(CHIP_COLORS.restriction)}>{parsed.restriction}</span>
             </>
           )}
-          <span style={connectorStyle}>.</span>
+          <span className={connectorClass}>.</span>
         </div>
       )}
     </div>

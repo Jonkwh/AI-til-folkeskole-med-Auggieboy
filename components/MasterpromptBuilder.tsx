@@ -184,14 +184,14 @@ export default function MasterpromptBuilder() {
     <div className="flex flex-col lg:flex-row gap-8 w-full max-w-6xl mx-auto p-6">
       {/* Left: Block Builder */}
       <div className="flex-1 min-w-0">
-        <h2 className="text-2xl font-semibold text-gray-900 mb-1">Byg din masterprompt</h2>
-        <p className="text-sm text-gray-500 mb-6">
+        <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-1">Byg din masterprompt</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
           Konfigurer hvordan ThinkBot skal opføre sig i denne chatsession.
         </p>
 
         <div className="relative space-y-4">
           {/* Vertical connecting line */}
-          <div className="absolute left-5 top-8 bottom-8 w-0.5 bg-gray-200 z-0" />
+          <div className="absolute left-5 top-8 bottom-8 w-0.5 bg-[var(--border)] z-0" />
 
           {BLOCKS.map((block, index) => (
             <div key={block.label} className="relative z-10">
@@ -229,7 +229,7 @@ export default function MasterpromptBuilder() {
                       <select
                         value={selections[dropdown.key]}
                         onChange={(e) => handleChange(dropdown.key, e.target.value)}
-                        className="text-sm rounded-lg px-3 py-1.5 bg-white border border-gray-300 text-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-1"
+                        className="text-sm rounded-lg px-3 py-1.5 bg-white dark:bg-[#3e3e42] border border-gray-300 dark:border-[#3e3e42] text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-1"
                         style={{ focusRingColor: block.color.border } as React.CSSProperties}
                       >
                         {dropdown.options.map((opt) => (
@@ -253,8 +253,8 @@ export default function MasterpromptBuilder() {
       {/* Right: Live Preview */}
       <div className="lg:w-96 flex-shrink-0">
         <div className="sticky top-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">Forhåndsvisning</h3>
-          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Forhåndsvisning</h3>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm">
             <div className="space-y-2 text-sm leading-relaxed">
               <p>
                 <span
@@ -306,7 +306,7 @@ export default function MasterpromptBuilder() {
               </p>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+            <div className="mt-4 pt-3 border-t border-[var(--border)] flex items-center justify-between">
               <span className="text-xs text-gray-400">
                 ~{tokenCount} tokens
               </span>
