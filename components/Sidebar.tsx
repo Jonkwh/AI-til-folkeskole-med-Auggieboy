@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import MasterpromptModal from './MasterpromptModal'
+import { useDarkMode } from '@/hooks/useDarkMode'
 
 interface ChatSession {
   id: string
@@ -22,6 +23,7 @@ export default function Sidebar() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const editInputRef = useRef<HTMLInputElement>(null)
+  const { isDark, toggleDark } = useDarkMode()
 
   useEffect(() => {
     loadSessions()
@@ -119,18 +121,18 @@ export default function Sidebar() {
   return (
     <>
     <MasterpromptModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-    <div className="w-72 h-full bg-gray-50 border-r border-gray-200 flex flex-col">
+    <div className="w-72 h-full bg-[var(--bg-surface)] border-r border-[var(--border)] flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-[var(--border)]">
         <div className="flex items-center gap-2 mb-4">
           <div className="w-8 h-8 rounded-lg bg-gray-900 flex items-center justify-center">
             <span className="text-white text-xs font-bold">TB</span>
           </div>
-          <span className="text-lg font-semibold text-gray-900">ThinkBot</span>
+          <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">ThinkBot</span>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="w-full py-2.5 px-4 rounded-lg border-2 border-dashed border-gray-300 text-sm font-medium text-gray-600 hover:border-gray-400 hover:text-gray-800 transition-colors"
+          className="w-full py-2.5 px-4 rounded-lg border-2 border-dashed border-[var(--border)] text-sm font-medium text-gray-600 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
         >
           + Ny chat
         </button>
@@ -205,8 +207,8 @@ export default function Sidebar() {
                   onClick={() => router.push(`/chat/${session.id}`)}
                   className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors ${
                     isActive
-                      ? 'bg-gray-200 text-gray-900'
-                      : 'text-gray-600 hover:bg-gray-100'
+                      ? 'bg-[var(--bg-card)] text-gray-900 dark:text-gray-100'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-[var(--bg-panel)]'
                   }`}
                 >
                   <div className="font-medium truncate pr-12">{session.title}</div>
@@ -250,10 +252,25 @@ export default function Sidebar() {
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 border-t border-[var(--border)] flex items-center gap-2">
+        <button
+          onClick={toggleDark}
+          title="Skift farvetema"
+          className="p-2 rounded-lg text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-[var(--bg-panel)] transition-colors"
+        >
+          {isDark ? (
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 7a5 5 0 100 10A5 5 0 0012 7z" />
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+            </svg>
+          )}
+        </button>
         <button
           onClick={handleLogout}
-          className="w-full py-2 px-4 rounded-lg text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+          className="flex-1 py-2 px-4 rounded-lg text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-[var(--bg-panel)] transition-colors"
         >
           Log ud
         </button>

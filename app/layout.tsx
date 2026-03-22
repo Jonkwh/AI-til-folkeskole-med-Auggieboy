@@ -13,7 +13,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="da">
-      <body className="font-sans antialiased bg-white text-gray-900">
+      <head>
+        {/* Apply saved theme synchronously to avoid flash */}
+        <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem('theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}` }} />
+      </head>
+      <body className="font-sans antialiased bg-[var(--bg-app)] text-gray-900 dark:text-gray-100">
         {children}
       </body>
     </html>
