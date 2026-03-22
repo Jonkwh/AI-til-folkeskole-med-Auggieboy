@@ -254,7 +254,7 @@ export default function MasterpromptBuilder() {
       <div className="lg:w-96 flex-shrink-0">
         <div className="sticky top-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Forhåndsvisning</h3>
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-5 shadow-sm">
+          <div className="rounded-xl border border-[var(--border)] bg-white dark:bg-[#2d2d30] p-5 shadow-sm">
             <div className="space-y-2 text-sm leading-relaxed">
               <p>
                 <span
