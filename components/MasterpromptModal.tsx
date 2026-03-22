@@ -19,7 +19,7 @@ export default function MasterpromptModal({ isOpen, onClose }: MasterpromptModal
       />
 
       {/* Modal container */}
-      <div className="relative z-10 bg-[var(--bg-card)] rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto mx-4">
+      <div className="relative z-10 bg-white dark:bg-[#2d2d30] rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto mx-4">
         {/* Close button */}
         <button
           onClick={onClose}

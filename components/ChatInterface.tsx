@@ -222,7 +222,7 @@ export default function ChatInterface({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--border)] bg-[var(--bg-surface)]">
+      <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--border)] bg-white dark:bg-[#252526]">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center">
             <span className="text-white text-xs font-bold">TB</span>
@@ -302,7 +302,7 @@ export default function ChatInterface({
       </div>
 
       {/* Input */}
-      <div className="px-6 py-4 border-t border-[var(--border)] bg-[var(--bg-surface)]">
+      <div className="px-6 py-4 border-t border-[var(--border)] bg-white dark:bg-[#252526]">
         <form onSubmit={handleSubmit} className="flex items-end gap-3">
           <textarea
             ref={textareaRef}

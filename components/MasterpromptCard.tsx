@@ -114,7 +114,7 @@ export default function MasterpromptCard({ masterprompt, defaultExpanded }: Mast
       </button>
 
       {expanded && (
-        <div className="rounded-[10px] border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2.5">
+        <div className="rounded-[10px] border border-[var(--border)] bg-white dark:bg-[#2d2d30] px-4 py-2.5">
           <span className={connectorClass}>Du er en </span>
           <span style={chipStyle(CHIP_COLORS.role)}>{parsed.role}</span>
           {parsed.grade && (
