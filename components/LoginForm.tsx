@@ -29,7 +29,7 @@ export default function LoginForm() {
       if (isSignUp) {
         const { error } = await supabase.auth.signUp({ email, password })
         if (error) throw error
-        setError('Tjek din email for et bekræftelseslink.')
+        router.push('/builder')
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
@@ -116,7 +116,7 @@ export default function LoginForm() {
             )}
 
             {error && (
-              <p className={`text-sm ${error.includes('Tjek din email') ? 'text-green-600' : 'text-red-600'}`}>
+              <p className="text-sm text-red-600">
                 {error}
               </p>
             )}
