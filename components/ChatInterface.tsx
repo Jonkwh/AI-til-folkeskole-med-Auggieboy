@@ -264,7 +264,7 @@ export default function ChatInterface({
                 msg.isError
                   ? ''
                   : msg.role === 'user'
-                    ? 'bg-gray-900 text-white dark:bg-[var(--bg-panel)] dark:text-gray-200'
+                    ? 'bg-gray-900 text-white'
                     : 'bg-[var(--bg-panel)] text-gray-800 dark:text-gray-200'
               }`}
               style={
