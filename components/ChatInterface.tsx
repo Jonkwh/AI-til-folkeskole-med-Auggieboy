@@ -224,7 +224,7 @@ export default function ChatInterface({
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--border)] bg-white dark:bg-[#252526]">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full bg-gray-900 dark:bg-gray-600 flex items-center justify-center">
             <span className="text-white text-xs font-bold">TB</span>
           </div>
           <div>
@@ -264,7 +264,7 @@ export default function ChatInterface({
                 msg.isError
                   ? ''
                   : msg.role === 'user'
-                    ? 'bg-gray-900 text-white'
+                    ? 'bg-gray-900 text-white dark:bg-[var(--bg-panel)] dark:text-gray-200'
                     : 'bg-[var(--bg-panel)] text-gray-800 dark:text-gray-200'
               }`}
               style={
