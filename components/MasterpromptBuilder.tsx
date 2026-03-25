@@ -17,18 +17,19 @@ interface BlockConfig {
 
 const BLOCKS: BlockConfig[] = [
   {
-    label: 'ROLLE',
-    prefix: 'Du er en ',
+    label: "AI'EN SKAL",
+    prefix: "AI'en skal ",
     color: { bg: '#CECBF6', border: '#AFA9EC', text: '#5B52C9' },
     dropdowns: [
       {
         key: 'role',
         options: [
-          'En tutor der stiller spørgsmål',
-          'Skrivecoach',
-          'Start-hjælper',
-          'Lektiehjælper',
-          'Ekspert',
+          'hjælpe med at forstå opgaven',
+          'give tekstideer',
+          'komme med ideer',
+          'give feedback på min tekst',
+          'hjælpe med at læse op til eksamen',
+          'hjælpe med datavisualisering',
         ],
       },
     ],
@@ -46,52 +47,6 @@ const BLOCKS: BlockConfig[] = [
       {
         key: 'subject',
         options: ['Dansk', 'Engelsk', 'Matematik', 'Historie', 'Samfundsfag', 'Naturfag', 'Alle fag'],
-      },
-    ],
-  },
-  {
-    label: 'MÅL',
-    prefix: 'Dit mål er at ',
-    color: { bg: '#B5D4F4', border: '#85B7EB', text: '#2563A8' },
-    dropdowns: [
-      {
-        key: 'goal',
-        options: [
-          'Udvikle kritisk tænkning',
-          'Støtte selvstændig problemløsning',
-          'Forklare svære begreber',
-          'Give konstruktiv feedback',
-        ],
-      },
-    ],
-  },
-  {
-    label: 'ADFÆRD',
-    prefix: 'Altid ',
-    color: { bg: '#FAC775', border: '#EF9F27', text: '#8B5A00' },
-    dropdowns: [
-      {
-        key: 'behaviour',
-        options: [
-          'Stil guidende spørgsmål i stedet for at give direkte svar',
-          'Få eleven til at reflektere før du svarer',
-          'Opdel komplekse problemer i mindre trin',
-        ],
-      },
-    ],
-  },
-  {
-    label: 'SPROG',
-    prefix: 'Svar på ',
-    color: { bg: '#C0DD97', border: '#97C459', text: '#3D6B0F' },
-    dropdowns: [
-      {
-        key: 'language',
-        options: [
-          'Samme sprog som eleven bruger',
-          'Dansk',
-          'Engelsk',
-        ],
       },
     ],
   },
@@ -120,10 +75,7 @@ export default function MasterpromptBuilder() {
     role: BLOCKS[0].dropdowns[0].options[0],
     grade: BLOCKS[1].dropdowns[0].options[0],
     subject: BLOCKS[1].dropdowns[1].options[0],
-    goal: BLOCKS[2].dropdowns[0].options[0],
-    behaviour: BLOCKS[3].dropdowns[0].options[0],
-    language: BLOCKS[4].dropdowns[0].options[0],
-    restriction: BLOCKS[5].dropdowns[0].options[0],
+    restriction: BLOCKS[2].dropdowns[0].options[0],
   })
   const [loading, setLoading] = useState(false)
 
@@ -133,11 +85,8 @@ export default function MasterpromptBuilder() {
 
   function assemblePrompt(): string {
     const lines = [
-      `Du er en ${selections.role}`,
+      `AI'en skal ${selections.role}`,
       `for elever i ${selections.grade} i ${selections.subject} i en dansk skole`,
-      `Dit mål er at ${selections.goal.toLowerCase()}.`,
-      `Altid ${selections.behaviour.toLowerCase()}.`,
-      `Svar på ${selections.language.toLowerCase()}.`,
       `Aldrig ${selections.restriction.toLowerCase()}.`,
     ]
     return lines.join('. \n')
@@ -261,7 +210,7 @@ export default function MasterpromptBuilder() {
                   className="rounded px-1.5 py-0.5 font-medium"
                   style={{ backgroundColor: BLOCKS[0].color.bg }}
                 >
-                  Du er en {selections.role}
+                  AI&apos;en skal {selections.role}
                 </span>
               </p>
               <p>
@@ -276,30 +225,6 @@ export default function MasterpromptBuilder() {
                 <span
                   className="rounded px-1.5 py-0.5 font-medium"
                   style={{ backgroundColor: BLOCKS[2].color.bg }}
-                >
-                  Dit mål er at {selections.goal.toLowerCase()}
-                </span>
-              </p>
-              <p>
-                <span
-                  className="rounded px-1.5 py-0.5 font-medium"
-                  style={{ backgroundColor: BLOCKS[3].color.bg }}
-                >
-                  Altid {selections.behaviour.toLowerCase()}
-                </span>
-              </p>
-              <p>
-                <span
-                  className="rounded px-1.5 py-0.5 font-medium"
-                  style={{ backgroundColor: BLOCKS[4].color.bg }}
-                >
-                  Svar på {selections.language.toLowerCase()}
-                </span>
-              </p>
-              <p>
-                <span
-                  className="rounded px-1.5 py-0.5 font-medium"
-                  style={{ backgroundColor: BLOCKS[5].color.bg }}
                 >
                   Aldrig {selections.restriction.toLowerCase()}
                 </span>
