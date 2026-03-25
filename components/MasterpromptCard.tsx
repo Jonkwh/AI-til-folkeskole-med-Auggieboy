@@ -44,7 +44,7 @@ function parseMasterprompt(text: string): ParsedValues | null {
   const roleValue = roleNewMatch ? roleNewMatch[1].trim() : roleLegacyMatch ? roleLegacyMatch[1].trim() : null
 
   // Context: "for elever i <grade> i <subject> [i en dansk skole]"
-  const contextMatch = text.match(/for elever i (.+?\s*klasse|.+?\s*klassetrin|Gymnasiet)\s+i\s+(.+?)(?:\s+i en dansk skole)?(?:\.\s|\.$|$)/m)
+  const contextMatch = text.match(/for elever i (.+?\s*klasse)\s+i\s+(.+?)(?:\s+i en dansk skole)?(?:\.\s|\.$|$)/m)
   const contextFallback = !contextMatch ? text.match(/for elever i (.+?)(?:\.\s|\.$|$)/m) : null
 
   const restrictionMatch = text.match(/Aldrig (.+?)(?:\.\s|\.$|$)/m)

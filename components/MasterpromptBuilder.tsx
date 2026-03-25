@@ -25,7 +25,7 @@ const BLOCKS: BlockConfig[] = [
         key: 'role',
         options: [
           'hjælpe med at forstå opgaven',
-          'give tekstideer',
+          'teste ideer',
           'komme med ideer',
           'give feedback på min tekst',
           'hjælpe med at læse op til eksamen',
@@ -42,7 +42,7 @@ const BLOCKS: BlockConfig[] = [
     dropdowns: [
       {
         key: 'grade',
-        options: ['8. klasse', '9. klasse', 'Gymnasiet', 'Alle klassetrin'],
+        options: ['7. klasse', '8. klasse', '9. klasse'],
       },
       {
         key: 'subject',
