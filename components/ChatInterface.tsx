@@ -24,6 +24,23 @@ interface ChatInterfaceProps {
 const RATE_LIMIT_WINDOW = 10_000 // 10 seconds
 const RATE_LIMIT_MAX = 5
 
+// Jaccard similarity between two messages based on word overlap. Returns 0–1.
+// Avoids Set spread to stay compatible with the project's TS/target config.
+function wordOverlapSimilarity(a: string, b: string): number {
+  const words = (s: string) =>
+    s.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter((w) => w.length > 2)
+  const wordsA = words(a)
+  const wordsB = words(b)
+  if (wordsA.length === 0 || wordsB.length === 0) return 0
+  const setB = new Set(wordsB)
+  const intersection = wordsA.filter((w) => setB.has(w)).length
+  const combined = wordsA.concat(wordsB)
+  const union = combined.filter((w, i) => combined.indexOf(w) === i).length
+  return intersection / union
+}
+
+const LOOP_SIMILARITY_THRESHOLD = 0.5
+
 const ASSIGNMENT_PATTERNS = [
   /skriv\s+(min|en|et|din)\s+(opgave|stil|afsnit|indledning|konklusion|besvarelse)/i,
   /skriv\s+opgaven/i,
@@ -50,6 +67,9 @@ export default function ChatInterface({
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messageTimestamps = useRef<number[]>([])
+  // Tracks whether the student appears to be looping. Set after each bot response,
+  // read on the next send, and cleared automatically when topics diverge.
+  const isLooping = useRef(false)
   const isNewChat = initialMessages.length === 0
 
   useEffect(() => {
@@ -144,6 +164,7 @@ export default function ChatInterface({
         body: JSON.stringify({
           messages: allMessages,
           systemPrompt: masterprompt,
+          isLooping: isLooping.current,
         }),
       })
 
@@ -192,6 +213,17 @@ export default function ChatInterface({
       }
 
       await saveMessage('assistant', fullContent)
+
+      // After each bot response, check if the student's last two messages are
+      // semantically similar. If so, flag the next request so Claude shifts strategy.
+      const userMsgs = allMessages.filter((m) => m.role === 'user')
+      if (userMsgs.length >= 2) {
+        const last = userMsgs[userMsgs.length - 1].content
+        const secondLast = userMsgs[userMsgs.length - 2].content
+        isLooping.current = wordOverlapSimilarity(last, secondLast) > LOOP_SIMILARITY_THRESHOLD
+      } else {
+        isLooping.current = false
+      }
     } catch (err) {
       console.error('Streaming error:', err)
       // Put the user's message back in the input so they can resend
