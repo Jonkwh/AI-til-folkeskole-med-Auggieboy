@@ -98,7 +98,7 @@ export default function ShareButton({ messages, masterprompt }: ShareButtonProps
             {/* Body */}
             <div className="flex-1 overflow-hidden px-5 py-4 flex flex-col gap-3">
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Du kan redigere indholdet inden du sender det til din lærer.
+                Forhåndsvisning af det der sendes til din lærer.
               </p>
 
               {generating ? (
@@ -117,8 +117,8 @@ export default function ShareButton({ messages, masterprompt }: ShareButtonProps
               ) : (
                 <textarea
                   value={transcript}
-                  onChange={(e) => setTranscript(e.target.value)}
-                  className="flex-1 min-h-[300px] w-full rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-sm text-gray-800 dark:text-gray-200 p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  readOnly
+                  className="flex-1 min-h-[300px] w-full rounded-lg border border-[var(--border)] bg-gray-50 dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-200 p-3 resize-none focus:outline-none cursor-default"
                 />
               )}
 

@@ -1,6 +1,6 @@
 import { Resend } from 'resend'
 
-const TEACHER_EMAIL = 'jonkw@itu.dk'
+const TEACHER_EMAIL = 'jonkristian.nyboder@gmail.com'
 
 export async function POST(req: Request) {
   try {
