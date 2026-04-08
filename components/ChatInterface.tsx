@@ -34,7 +34,7 @@ interface ChatInterfaceProps {
 
 const RATE_LIMIT_WINDOW = 10_000 // 10 seconds
 const RATE_LIMIT_MAX = 5
-const LOOP_SIMILARITY_THRESHOLD = 0.5
+const LOOP_SIMILARITY_THRESHOLD = 0.7
 
 const RE_ENGAGEMENT_OPTIONS = [
   'Giv mig et hint',
@@ -49,7 +49,7 @@ const RE_ENGAGEMENT_PROMPTS: Record<string, string> = {
   'Prøv et nyt spørgsmål':
     '\n\n[INTERNAL NOTE: The student wants a different angle. Keep the same scaffolding level but rotate to a different question type from your previous turn.]',
   'Forklar konceptet':
-    '\n\n[INTERNAL NOTE: The student wants a direct explanation. Proceed to Level 5: directly explain the concept blocking the student without writing their assignment.]',
+    '\n\n[INTERNAL NOTE — OVERRIDE: The student has explicitly asked for a direct explanation. You MUST explain the concept directly in plain language in this response. Do NOT ask a question. Do NOT redirect. Suspend Rule 1 and the scaffolding ladder for this response only. After explaining, you may return to the normal approach.]',
   'Start forfra':
     '\n\n[INTERNAL NOTE: The student wants to start over. Reset to Level 1 of the scaffolding ladder and begin with a forethought question.]',
 }
@@ -281,7 +281,13 @@ export default function ChatInterface({
       if (userMsgs.length >= 2) {
         const last = userMsgs[userMsgs.length - 1].content
         const secondLast = userMsgs[userMsgs.length - 2].content
-        isLooping.current = wordOverlapSimilarity(last, secondLast) > LOOP_SIMILARITY_THRESHOLD
+        // Short responses (≤15 chars) are almost always direct replies to a
+        // question, not loops — skip the similarity check entirely.
+        if (last.length <= 15 || secondLast.length <= 15) {
+          isLooping.current = false
+        } else {
+          isLooping.current = wordOverlapSimilarity(last, secondLast) > LOOP_SIMILARITY_THRESHOLD
+        }
       } else {
         isLooping.current = false
       }
