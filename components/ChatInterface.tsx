@@ -307,14 +307,26 @@ export default function ChatInterface({
     setStep1Answer(option)
   }
 
-  function handleStep2Select(option: string) {
+  async function handleStep2Select(option: string) {
     if (!onboardingSteps || !step1Answer) return
     setStep2Answer(option)
-    // Assemble the context string that will be prepended to the first real
-    // user message. After that injection it is never read again.
+    // Full context string — sent to the API only, never stored or rendered.
     const context = `[STUDENT CONTEXT: ${onboardingSteps[0].question}: ${step1Answer}. ${onboardingSteps[1].question}: ${option}.]`
-    studentContextRef.current = context
+    // Mark as consumed so handleSubmit never injects it on a subsequent call.
+    studentContextRef.current = ''
     setOnboardingComplete(true)
+
+    // Display label shown in the student bubble and saved to Supabase.
+    // The raw bracketed context string is API-only.
+    const displayLabel = `${step1Answer} — ${option}`
+    const newUserMsg: Message = { role: 'user', content: displayLabel, created_at: new Date().toISOString() }
+    setMessages((prev) => [...prev, newUserMsg])
+    await saveMessage('user', displayLabel)
+    updateSessionTitle(displayLabel)
+
+    // Fire immediately with the context string as the sole user message.
+    // messages state is empty at this point — no prior messages to include.
+    await callChatAPI([{ role: 'user', content: context }])
   }
 
   // ── Re-engagement handler ───────────────────────────────────────────────────
@@ -345,7 +357,6 @@ export default function ChatInterface({
       isStreaming ||
       rateLimited ||
       assignmentBlocked ||
-      !onboardingComplete ||
       !!activeReEngagement
     ) return
 
@@ -359,22 +370,32 @@ export default function ChatInterface({
       return
     }
 
-    // Inject student context on the first real message only.
-    // messages.length is the stale closure value — it is 0 until the state
-    // update below commits, making this check accurate at submission time.
-    const messageContent =
-      messages.length === 0 && studentContextRef.current
-        ? `${studentContextRef.current}\n\n${userMessage}`
-        : userMessage
+    // Handle freetext submission during onboarding — treat typed text as the
+    // onboarding answer, assemble context, and mark onboarding complete so the
+    // normal message flow below injects context on the first call.
+    if (!onboardingComplete && onboardingSteps) {
+      if (!step1Answer) {
+        // Freetext during step 1 — skip step 2, use partial context
+        const context = `[STUDENT CONTEXT: ${onboardingSteps[0].question}: ${userMessage}.]`
+        studentContextRef.current = context
+      } else if (!step2Answer) {
+        // Freetext during step 2 — assemble full context
+        const context = `[STUDENT CONTEXT: ${onboardingSteps[0].question}: ${step1Answer}. ${onboardingSteps[1].question}: ${userMessage}.]`
+        studentContextRef.current = context
+      }
+      setOnboardingComplete(true)
+    }
 
-    // Update title from first user message (raw, without context prefix).
+    // Update title from first user message.
     if (messages.length === 0) {
       updateSessionTitle(userMessage)
     }
 
-    const newUserMsg: Message = { role: 'user', content: messageContent, created_at: new Date().toISOString() }
+    // newUserMsg always stores the clean typed text — the context prefix is
+    // never saved to Supabase or rendered in the student bubble.
+    const newUserMsg: Message = { role: 'user', content: userMessage, created_at: new Date().toISOString() }
     setMessages((prev) => [...prev, newUserMsg])
-    await saveMessage('user', messageContent)
+    await saveMessage('user', userMessage)
     setInput('')
 
     // If the student appears to be looping, pause the API call and show the
@@ -387,7 +408,18 @@ export default function ChatInterface({
       return
     }
 
-    const allMessages = [...messages, newUserMsg].map((m) => ({ role: m.role, content: m.content }))
+    // Inject context into the API payload for the first call only.
+    // messages.length is the stale closure value — still 0 at this point.
+    const apiContent =
+      messages.length === 0 && studentContextRef.current
+        ? `${studentContextRef.current}\n\n${userMessage}`
+        : userMessage
+    if (messages.length === 0) studentContextRef.current = ''
+
+    const allMessages = [
+      ...messages.map((m) => ({ role: m.role, content: m.content })),
+      { role: 'user' as const, content: apiContent },
+    ]
     await callChatAPI(allMessages, undefined, userMessage)
   }
 
@@ -399,10 +431,12 @@ export default function ChatInterface({
   }
 
   const sendDisabled =
-    !input.trim() || isStreaming || rateLimited || !onboardingComplete || !!activeReEngagement
-  const inputDisabled = !onboardingComplete || !!activeReEngagement || isStreaming
+    !input.trim() || isStreaming || rateLimited || !!activeReEngagement
+  const inputDisabled = !!activeReEngagement || isStreaming
   const inputPlaceholder = !onboardingComplete
-    ? 'Vælg et svar ovenfor...'
+    ? step1Answer
+      ? 'Eller skriv dit eget svar...'
+      : 'Eller beskriv hvad du arbejder med...'
     : activeReEngagement
     ? 'Vælg en mulighed ovenfor...'
     : 'Skriv din besked...'
@@ -501,6 +535,13 @@ export default function ChatInterface({
                   })}
                 </div>
 
+                {/* Helper text — only visible while onboarding is incomplete */}
+                {!onboardingComplete && (
+                  <p className="text-xs text-gray-400 dark:text-gray-500 pt-1">
+                    Vælg en mulighed, eller skriv dit eget svar nedenfor
+                  </p>
+                )}
+
                 {/* After step 1 selection */}
                 {step1Answer && (
                   <div className="space-y-3 animate-fade-in">
@@ -535,6 +576,13 @@ export default function ChatInterface({
                         )
                       })}
                     </div>
+
+                    {/* Helper text — only visible while onboarding is incomplete */}
+                    {!onboardingComplete && (
+                      <p className="text-xs text-gray-400 dark:text-gray-500 pt-1">
+                        Vælg en mulighed, eller skriv dit eget svar nedenfor
+                      </p>
+                    )}
 
                     {/* Student bubble for step 2 */}
                     {step2Answer && (
