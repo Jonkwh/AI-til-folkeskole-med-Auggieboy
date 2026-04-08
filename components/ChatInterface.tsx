@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, Fragment } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { createClient } from '@/lib/supabase'
 import ShareButton from './ShareButton'
@@ -14,6 +14,16 @@ interface Message {
   isError?: boolean
 }
 
+interface OnboardingStep {
+  question: string
+  options: string[]
+}
+
+interface ReEngagementEntry {
+  afterIndex: number
+  selectedOption: string | null
+}
+
 interface ChatInterfaceProps {
   sessionId: string
   masterprompt: string
@@ -23,6 +33,46 @@ interface ChatInterfaceProps {
 
 const RATE_LIMIT_WINDOW = 10_000 // 10 seconds
 const RATE_LIMIT_MAX = 5
+const LOOP_SIMILARITY_THRESHOLD = 0.5
+
+const RE_ENGAGEMENT_OPTIONS = [
+  'Giv mig et hint',
+  'Prøv et nyt spørgsmål',
+  'Forklar konceptet',
+  'Start forfra',
+]
+
+const RE_ENGAGEMENT_PROMPTS: Record<string, string> = {
+  'Giv mig et hint':
+    '\n\n[INTERNAL NOTE: The student has requested a hint. Move to the next level on the scaffolding ladder.]',
+  'Prøv et nyt spørgsmål':
+    '\n\n[INTERNAL NOTE: The student wants a different angle. Keep the same scaffolding level but rotate to a different question type from your previous turn.]',
+  'Forklar konceptet':
+    '\n\n[INTERNAL NOTE: The student wants a direct explanation. Proceed to Level 5: directly explain the concept blocking the student without writing their assignment.]',
+  'Start forfra':
+    '\n\n[INTERNAL NOTE: The student wants to start over. Reset to Level 1 of the scaffolding ladder and begin with a forethought question.]',
+}
+
+const ONBOARDING_FALLBACK: OnboardingStep[] = [
+  {
+    question: 'Hvad arbejder du med i dag?',
+    options: ['Jeg er lige startet', 'Jeg er i gang, men sidder fast', 'Jeg har et udkast'],
+  },
+  {
+    question: 'Hvad ville hjælpe dig mest?',
+    options: ['Forstå opgaven', 'Komme i gang', 'Tjekke mit arbejde'],
+  },
+]
+
+const ASSIGNMENT_PATTERNS = [
+  /skriv\s+(min|en|et|din)\s+(opgave|stil|afsnit|indledning|konklusion|besvarelse)/i,
+  /skriv\s+opgaven/i,
+  /lav\s+(min|en|et|din)\s+(opgave|stil|afsnit|indledning|konklusion|besvarelse)/i,
+  /lav\s+opgaven/i,
+  /kan\s+du\s+(skrive|lave)/i,
+  /færdiggør\s+min/i,
+  /afslut\s+min/i,
+]
 
 // Jaccard similarity between two messages based on word overlap. Returns 0–1.
 // Avoids Set spread to stay compatible with the project's TS/target config.
@@ -38,18 +88,6 @@ function wordOverlapSimilarity(a: string, b: string): number {
   const union = combined.filter((w, i) => combined.indexOf(w) === i).length
   return intersection / union
 }
-
-const LOOP_SIMILARITY_THRESHOLD = 0.5
-
-const ASSIGNMENT_PATTERNS = [
-  /skriv\s+(min|en|et|din)\s+(opgave|stil|afsnit|indledning|konklusion|besvarelse)/i,
-  /skriv\s+opgaven/i,
-  /lav\s+(min|en|et|din)\s+(opgave|stil|afsnit|indledning|konklusion|besvarelse)/i,
-  /lav\s+opgaven/i,
-  /kan\s+du\s+(skrive|lave)/i,
-  /færdiggør\s+min/i,
-  /afslut\s+min/i,
-]
 
 export default function ChatInterface({
   sessionId,
@@ -72,9 +110,56 @@ export default function ChatInterface({
   const isLooping = useRef(false)
   const isNewChat = initialMessages.length === 0
 
+  // ── Onboarding ─────────────────────────────────────────────────────────────
+  // onboardingFetchedRef is set synchronously before the first async tick to
+  // prevent double-fetching in React Strict Mode's double-invocation of effects.
+  const onboardingFetchedRef = useRef(false)
+  // Holds the assembled [STUDENT CONTEXT: ...] string until it is injected into
+  // the first real API call, after which it is no longer read.
+  const studentContextRef = useRef('')
+  const [onboardingSteps, setOnboardingSteps] = useState<OnboardingStep[] | null>(null)
+  // Start in loading state for new chats so the placeholder renders immediately.
+  const [onboardingLoading, setOnboardingLoading] = useState(isNewChat)
+  const [step1Answer, setStep1Answer] = useState<string | null>(null)
+  const [step2Answer, setStep2Answer] = useState<string | null>(null)
+  // Initialised to true for returning users (no onboarding needed).
+  const [onboardingComplete, setOnboardingComplete] = useState(!isNewChat)
+
+  // ── Re-engagement ───────────────────────────────────────────────────────────
+  // Each entry is positioned at a specific index in the messages array so the
+  // re-engagement UI renders inline between the student's looping message and
+  // the subsequent bot response, regardless of how many messages follow.
+  const [reEngagements, setReEngagements] = useState<ReEngagementEntry[]>([])
+  const activeReEngagement = reEngagements.find((re) => re.selectedOption === null) ?? null
+
+  // ── Fetch onboarding questions once per new chat ────────────────────────────
+  useEffect(() => {
+    if (!isNewChat || onboardingFetchedRef.current) return
+    onboardingFetchedRef.current = true // set before first async tick
+
+    fetch('/api/onboarding', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ systemPrompt: masterprompt }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('Onboarding fetch failed')
+        return res.json()
+      })
+      .then((data) => {
+        if (Array.isArray(data.steps) && data.steps.length >= 2) {
+          setOnboardingSteps(data.steps.slice(0, 2))
+        } else {
+          setOnboardingSteps(ONBOARDING_FALLBACK)
+        }
+      })
+      .catch(() => setOnboardingSteps(ONBOARDING_FALLBACK))
+      .finally(() => setOnboardingLoading(false))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, onboardingSteps, step1Answer, step2Answer, reEngagements])
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -123,74 +208,48 @@ export default function ChatInterface({
     })
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!input.trim() || isStreaming || rateLimited || assignmentBlocked) return
-
-    if (!checkRateLimit()) return
-
-    const userMessage = input.trim()
-
-    // Client-side guardrail: check for assignment writing requests
-    if (ASSIGNMENT_PATTERNS.some((p) => p.test(userMessage))) {
-      setAssignmentBlocked(true)
-      return
-    }
-
-    // Update title from first user message
-    if (messages.length === 0) {
-      updateSessionTitle(userMessage)
-    }
-
-    const newUserMsg: Message = { role: 'user', content: userMessage, created_at: new Date().toISOString() }
-    setMessages((prev) => [...prev, newUserMsg])
-    await saveMessage('user', userMessage)
-
+  // ── Core API call ───────────────────────────────────────────────────────────
+  // Extracted so both handleSubmit and handleReEngagementSelect can call it.
+  // systemPromptOverride: used by re-engagement to append a one-shot INTERNAL NOTE.
+  //   When set, isLooping is sent as false (the note already handles the strategy).
+  // restoreInputOnError: when provided, restores the textarea on API failure so
+  //   the student can resend without retyping.
+  async function callChatAPI(
+    conversationMessages: { role: string; content: string }[],
+    systemPromptOverride?: string,
+    restoreInputOnError?: string,
+  ) {
     setIsStreaming(true)
-    // Clear input only after we know we're sending
-    setInput('')
     const assistantMsg: Message = { role: 'assistant', content: '', created_at: new Date().toISOString() }
     setMessages((prev) => [...prev, assistantMsg])
 
     try {
-      const allMessages = [...messages, newUserMsg].map((m) => ({
-        role: m.role,
-        content: m.content,
-      }))
-
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: allMessages,
-          systemPrompt: masterprompt,
-          isLooping: isLooping.current,
+          messages: conversationMessages,
+          systemPrompt: systemPromptOverride ?? masterprompt,
+          // When a re-engagement override is present the student has already
+          // acknowledged the loop via card selection, so we suppress the server-
+          // side loop hint to avoid doubling up on instructions.
+          isLooping: systemPromptOverride ? false : isLooping.current,
         }),
       })
 
       if (!response.ok) {
         const status = response.status
         console.error(`Chat API returned ${status}`)
-
-        let errorMessage: string
-        if (status === 429) {
-          errorMessage = 'ThinkBot er lidt overbelastet lige nu. Vent et øjeblik og prøv igen 🙂'
-        } else {
-          errorMessage = 'Noget gik galt. Prøv at sende din besked igen.'
-        }
-
-        // Put the user's message back in the input so they can resend
-        setInput(userMessage)
+        const errorMessage =
+          status === 429
+            ? 'ThinkBot er lidt overbelastet lige nu. Vent et øjeblik og prøv igen 🙂'
+            : 'Noget gik galt. Prøv at sende din besked igen.'
+        if (restoreInputOnError) setInput(restoreInputOnError)
         setMessages((prev) => {
           const updated = [...prev]
-          updated[updated.length - 1] = {
-            role: 'assistant',
-            content: errorMessage,
-            isError: true,
-          }
+          updated[updated.length - 1] = { role: 'assistant', content: errorMessage, isError: true }
           return updated
         })
-        setIsStreaming(false)
         return
       }
 
@@ -215,8 +274,9 @@ export default function ChatInterface({
       await saveMessage('assistant', fullContent)
 
       // After each bot response, check if the student's last two messages are
-      // semantically similar. If so, flag the next request so Claude shifts strategy.
-      const userMsgs = allMessages.filter((m) => m.role === 'user')
+      // semantically similar. If so, flag the next request so the re-engagement
+      // card flow is triggered instead of sending directly.
+      const userMsgs = conversationMessages.filter((m) => m.role === 'user')
       if (userMsgs.length >= 2) {
         const last = userMsgs[userMsgs.length - 1].content
         const secondLast = userMsgs[userMsgs.length - 2].content
@@ -226,8 +286,7 @@ export default function ChatInterface({
       }
     } catch (err) {
       console.error('Streaming error:', err)
-      // Put the user's message back in the input so they can resend
-      setInput(userMessage)
+      if (restoreInputOnError) setInput(restoreInputOnError)
       setMessages((prev) => {
         const updated = [...prev]
         updated[updated.length - 1] = {
@@ -242,6 +301,96 @@ export default function ChatInterface({
     }
   }
 
+  // ── Onboarding handlers ─────────────────────────────────────────────────────
+
+  function handleStep1Select(option: string) {
+    setStep1Answer(option)
+  }
+
+  function handleStep2Select(option: string) {
+    if (!onboardingSteps || !step1Answer) return
+    setStep2Answer(option)
+    // Assemble the context string that will be prepended to the first real
+    // user message. After that injection it is never read again.
+    const context = `[STUDENT CONTEXT: ${onboardingSteps[0].question}: ${step1Answer}. ${onboardingSteps[1].question}: ${option}.]`
+    studentContextRef.current = context
+    setOnboardingComplete(true)
+  }
+
+  // ── Re-engagement handler ───────────────────────────────────────────────────
+
+  async function handleReEngagementSelect(option: string, afterIndex: number) {
+    // Mark the selected card immediately so the UI locks before the API call.
+    setReEngagements((prev) =>
+      prev.map((re) => (re.afterIndex === afterIndex ? { ...re, selectedOption: option } : re))
+    )
+    isLooping.current = false
+
+    // Append the per-choice instruction to the system prompt for this single
+    // call only. It is not stored and does not affect any subsequent calls.
+    const systemPromptWithNote = masterprompt + (RE_ENGAGEMENT_PROMPTS[option] ?? '')
+
+    // messages state at this point includes the pending student message that
+    // triggered the re-engagement (added in handleSubmit before returning).
+    const allMessages = messages.map((m) => ({ role: m.role, content: m.content }))
+    await callChatAPI(allMessages, systemPromptWithNote)
+  }
+
+  // ── Submit ──────────────────────────────────────────────────────────────────
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (
+      !input.trim() ||
+      isStreaming ||
+      rateLimited ||
+      assignmentBlocked ||
+      !onboardingComplete ||
+      !!activeReEngagement
+    ) return
+
+    if (!checkRateLimit()) return
+
+    const userMessage = input.trim()
+
+    // Client-side guardrail: check for assignment writing requests
+    if (ASSIGNMENT_PATTERNS.some((p) => p.test(userMessage))) {
+      setAssignmentBlocked(true)
+      return
+    }
+
+    // Inject student context on the first real message only.
+    // messages.length is the stale closure value — it is 0 until the state
+    // update below commits, making this check accurate at submission time.
+    const messageContent =
+      messages.length === 0 && studentContextRef.current
+        ? `${studentContextRef.current}\n\n${userMessage}`
+        : userMessage
+
+    // Update title from first user message (raw, without context prefix).
+    if (messages.length === 0) {
+      updateSessionTitle(userMessage)
+    }
+
+    const newUserMsg: Message = { role: 'user', content: messageContent, created_at: new Date().toISOString() }
+    setMessages((prev) => [...prev, newUserMsg])
+    await saveMessage('user', messageContent)
+    setInput('')
+
+    // If the student appears to be looping, pause the API call and show the
+    // re-engagement card flow instead. The afterIndex points to the position
+    // of newUserMsg in the updated messages array (messages.length before the
+    // state update = the new index after it commits).
+    if (isLooping.current) {
+      const afterIndex = messages.length
+      setReEngagements((prev) => [...prev, { afterIndex, selectedOption: null }])
+      return
+    }
+
+    const allMessages = [...messages, newUserMsg].map((m) => ({ role: m.role, content: m.content }))
+    await callChatAPI(allMessages, undefined, userMessage)
+  }
+
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -249,7 +398,44 @@ export default function ChatInterface({
     }
   }
 
-  const sendDisabled = !input.trim() || isStreaming || rateLimited
+  const sendDisabled =
+    !input.trim() || isStreaming || rateLimited || !onboardingComplete || !!activeReEngagement
+  const inputDisabled = !onboardingComplete || !!activeReEngagement || isStreaming
+  const inputPlaceholder = !onboardingComplete
+    ? 'Vælg et svar ovenfor...'
+    : activeReEngagement
+    ? 'Vælg en mulighed ovenfor...'
+    : 'Skriv din besked...'
+
+  // ── Shared card class builder ───────────────────────────────────────────────
+  // Returns the Tailwind class string for an option card given its selection state.
+  function cardClasses(
+    isSelected: boolean,
+    isFaded: boolean,
+    isPending: boolean,
+    variant: 'default' | 'amber' = 'default',
+  ): string {
+    const base = 'border rounded-xl px-4 py-2 text-sm text-left transition-colors'
+    const borderAndText =
+      variant === 'amber'
+        ? 'border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300'
+        : 'border-[var(--border)] text-gray-800 dark:text-gray-200'
+
+    if (isSelected) return `${base} cursor-default`
+    if (isFaded) return `${base} bg-[var(--bg-card)] ${borderAndText} pointer-events-none`
+    if (isPending)
+      return `${base} bg-[var(--bg-card)] ${borderAndText} hover:bg-[var(--bg-surface)] cursor-pointer`
+    return `${base} bg-[var(--bg-card)] ${borderAndText}`
+  }
+
+  function cardStyle(
+    isSelected: boolean,
+    isFaded: boolean,
+  ): React.CSSProperties | undefined {
+    if (isSelected) return { backgroundColor: '#1a1a2e', color: '#ffffff', borderColor: '#1a1a2e' }
+    if (isFaded) return { opacity: 0.35 }
+    return undefined
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -272,64 +458,184 @@ export default function ChatInterface({
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-        {messages.length === 0 && (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-[var(--bg-card)] flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl text-gray-400 dark:text-gray-500">TB</span>
+
+        {/* ── Onboarding flow ──────────────────────────────────────────────────
+            Replaces the static empty state for new chats. Remains visible in
+            the message area after completion — cards lock in their final state. */}
+        {isNewChat && (
+          <div className="space-y-3">
+            {/* Loading placeholder */}
+            {onboardingLoading && (
+              <div className="flex justify-start animate-fade-in">
+                <div className="max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed bg-[var(--bg-panel)] text-gray-500 dark:text-gray-400 italic">
+                  Henter spørgsmål...
+                </div>
               </div>
-              <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300">Start en samtale</h3>
-              <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
-                Din masterprompt er klar. Skriv din første besked nedenfor.
-              </p>
-            </div>
+            )}
+
+            {/* Steps — rendered once loading is done */}
+            {!onboardingLoading && onboardingSteps && (
+              <div className="space-y-3 animate-fade-in">
+                {/* Step 1: bot question */}
+                <div className="flex justify-start">
+                  <div className="max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed bg-[var(--bg-panel)] text-gray-800 dark:text-gray-200">
+                    {onboardingSteps[0].question}
+                  </div>
+                </div>
+
+                {/* Step 1: option cards */}
+                <div className="flex flex-wrap gap-2">
+                  {onboardingSteps[0].options.map((option) => {
+                    const isSelected = step1Answer === option
+                    const isFaded = !!step1Answer && !isSelected
+                    return (
+                      <button
+                        key={option}
+                        onClick={() => !step1Answer && handleStep1Select(option)}
+                        className={cardClasses(isSelected, isFaded, !step1Answer)}
+                        style={cardStyle(isSelected, isFaded)}
+                      >
+                        {option}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* After step 1 selection */}
+                {step1Answer && (
+                  <div className="space-y-3 animate-fade-in">
+                    {/* Student bubble */}
+                    <div className="flex justify-end">
+                      <div className="max-w-[75%] rounded-2xl px-4 py-3 text-sm bg-gray-900 text-white">
+                        {step1Answer}
+                      </div>
+                    </div>
+
+                    {/* Step 2: bot question */}
+                    <div className="flex justify-start">
+                      <div className="max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed bg-[var(--bg-panel)] text-gray-800 dark:text-gray-200">
+                        {onboardingSteps[1].question}
+                      </div>
+                    </div>
+
+                    {/* Step 2: option cards */}
+                    <div className="flex flex-wrap gap-2">
+                      {onboardingSteps[1].options.map((option) => {
+                        const isSelected = step2Answer === option
+                        const isFaded = !!step2Answer && !isSelected
+                        return (
+                          <button
+                            key={option}
+                            onClick={() => !step2Answer && handleStep2Select(option)}
+                            className={cardClasses(isSelected, isFaded, !step2Answer)}
+                            style={cardStyle(isSelected, isFaded)}
+                          >
+                            {option}
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {/* Student bubble for step 2 */}
+                    {step2Answer && (
+                      <div className="flex justify-end animate-fade-in">
+                        <div className="max-w-[75%] rounded-2xl px-4 py-3 text-sm bg-gray-900 text-white">
+                          {step2Answer}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
+        {/* ── Message history ──────────────────────────────────────────────────
+            Re-engagement sections are rendered as siblings after the message
+            that triggered them (afterIndex === idx), so they always appear
+            between the student's looping message and the bot's response. */}
         {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                msg.isError
-                  ? ''
-                  : msg.role === 'user'
+          <Fragment key={idx}>
+            <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div
+                className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                  msg.isError
+                    ? ''
+                    : msg.role === 'user'
                     ? 'bg-gray-900 text-white'
                     : 'bg-[var(--bg-panel)] text-gray-800 dark:text-gray-200'
-              }`}
-              style={
-                msg.isError
-                  ? { backgroundColor: '#F5C4B3', color: '#993C1D' }
-                  : undefined
-              }
-            >
-              {msg.role === 'assistant' && !msg.isError ? (
-                <div className="markdown-content" style={{ overflow: 'hidden' }}>
-                  <ReactMarkdown
-                    components={{
-                      h2: ({ children }) => <h2 style={{ fontWeight: 500, fontSize: '1.05em', marginTop: 12, marginBottom: 4 }}>{children}</h2>,
-                      h3: ({ children }) => <h3 style={{ fontWeight: 500, fontSize: '1em', marginTop: 12, marginBottom: 4 }}>{children}</h3>,
-                      p: ({ children }) => <p style={{ marginBottom: 8 }}>{children}</p>,
-                      strong: ({ children }) => <strong style={{ fontWeight: 500 }}>{children}</strong>,
-                      ul: ({ children }) => <ul style={{ paddingLeft: 16, listStyleType: 'disc', marginBottom: 8 }}>{children}</ul>,
-                      ol: ({ children }) => <ol style={{ paddingLeft: 16, listStyleType: 'decimal', marginBottom: 8 }}>{children}</ol>,
-                      li: ({ children }) => <li style={{ marginBottom: 4 }}>{children}</li>,
-                    }}
-                  >
-                    {msg.content}
-                  </ReactMarkdown>
-                </div>
-              ) : (
-                <div className="whitespace-pre-wrap">{msg.content}</div>
-              )}
-              {msg.role === 'assistant' && isStreaming && idx === messages.length - 1 && !msg.isError && (
-                <span className="inline-block w-1.5 h-4 bg-gray-400 animate-pulse ml-0.5" />
-              )}
+                }`}
+                style={
+                  msg.isError
+                    ? { backgroundColor: '#F5C4B3', color: '#993C1D' }
+                    : undefined
+                }
+              >
+                {msg.role === 'assistant' && !msg.isError ? (
+                  <div className="markdown-content" style={{ overflow: 'hidden' }}>
+                    <ReactMarkdown
+                      components={{
+                        h2: ({ children }) => <h2 style={{ fontWeight: 500, fontSize: '1.05em', marginTop: 12, marginBottom: 4 }}>{children}</h2>,
+                        h3: ({ children }) => <h3 style={{ fontWeight: 500, fontSize: '1em', marginTop: 12, marginBottom: 4 }}>{children}</h3>,
+                        p: ({ children }) => <p style={{ marginBottom: 8 }}>{children}</p>,
+                        strong: ({ children }) => <strong style={{ fontWeight: 500 }}>{children}</strong>,
+                        ul: ({ children }) => <ul style={{ paddingLeft: 16, listStyleType: 'disc', marginBottom: 8 }}>{children}</ul>,
+                        ol: ({ children }) => <ol style={{ paddingLeft: 16, listStyleType: 'decimal', marginBottom: 8 }}>{children}</ol>,
+                        li: ({ children }) => <li style={{ marginBottom: 4 }}>{children}</li>,
+                      }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
+                  </div>
+                ) : (
+                  <div className="whitespace-pre-wrap">{msg.content}</div>
+                )}
+                {msg.role === 'assistant' && isStreaming && idx === messages.length - 1 && !msg.isError && (
+                  <span className="inline-block w-1.5 h-4 bg-gray-400 animate-pulse ml-0.5" />
+                )}
+              </div>
             </div>
-          </div>
+
+            {/* Re-engagement section for this message index.
+                afterIndex is stable per entry, so multiple re-engagements across
+                a long conversation are each anchored to their triggering message. */}
+            {reEngagements
+              .filter((re) => re.afterIndex === idx)
+              .map((re) => (
+                <div key={re.afterIndex} className="space-y-3 animate-fade-in">
+                  {/* Bot bubble — amber styling signals a meta/strategic moment */}
+                  <div className="flex justify-start">
+                    <div className="max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed border bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200">
+                      Det ser ud til at vi er gået lidt i stå — det sker! Hvad ville hjælpe dig mest lige nu?
+                    </div>
+                  </div>
+
+                  {/* Option cards */}
+                  <div className="flex flex-wrap gap-2">
+                    {RE_ENGAGEMENT_OPTIONS.map((option) => {
+                      const isSelected = re.selectedOption === option
+                      const isFaded = !!re.selectedOption && !isSelected
+                      return (
+                        <button
+                          key={option}
+                          onClick={() =>
+                            !re.selectedOption &&
+                            handleReEngagementSelect(option, re.afterIndex)
+                          }
+                          className={cardClasses(isSelected, isFaded, !re.selectedOption, 'amber')}
+                          style={cardStyle(isSelected, isFaded)}
+                        >
+                          {option}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+          </Fragment>
         ))}
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -341,9 +647,10 @@ export default function ChatInterface({
             value={input}
             onChange={(e) => { setInput(e.target.value); setAssignmentBlocked(false) }}
             onKeyDown={handleKeyDown}
-            placeholder="Skriv din besked..."
+            placeholder={inputPlaceholder}
+            disabled={inputDisabled}
             rows={1}
-            className="flex-1 resize-none rounded-xl border border-[var(--border)] bg-[var(--bg-input)] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600 focus:border-transparent"
+            className="flex-1 resize-none rounded-xl border border-[var(--border)] bg-[var(--bg-input)] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
           />
           <button
             type="submit"
