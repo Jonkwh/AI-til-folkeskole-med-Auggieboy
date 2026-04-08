@@ -12,6 +12,7 @@ interface Message {
   content: string
   created_at?: string
   isError?: boolean
+  isHidden?: boolean
 }
 
 interface OnboardingStep {
@@ -319,7 +320,7 @@ export default function ChatInterface({
     // Display label shown in the student bubble and saved to Supabase.
     // The raw bracketed context string is API-only.
     const displayLabel = `${step1Answer} — ${option}`
-    const newUserMsg: Message = { role: 'user', content: displayLabel, created_at: new Date().toISOString() }
+    const newUserMsg: Message = { role: 'user', content: displayLabel, created_at: new Date().toISOString(), isHidden: true }
     setMessages((prev) => [...prev, newUserMsg])
     await saveMessage('user', displayLabel)
     updateSessionTitle(displayLabel)
@@ -605,7 +606,7 @@ export default function ChatInterface({
             between the student's looping message and the bot's response. */}
         {messages.map((msg, idx) => (
           <Fragment key={idx}>
-            <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            {!msg.isHidden && <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div
                 className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                   msg.isError
@@ -643,7 +644,7 @@ export default function ChatInterface({
                   <span className="inline-block w-1.5 h-4 bg-gray-400 animate-pulse ml-0.5" />
                 )}
               </div>
-            </div>
+            </div>}
 
             {/* Re-engagement section for this message index.
                 afterIndex is stable per entry, so multiple re-engagements across
