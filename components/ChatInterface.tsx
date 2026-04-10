@@ -291,6 +291,14 @@ export default function ChatInterface({
       } else {
         isLooping.current = false
       }
+      // Also trigger loop detection if the last 3 student messages are all under
+      // 30 characters — catches stuck/confused patterns without lexical repetition.
+      if (userMsgs.length >= 3) {
+        const lastThree = userMsgs.slice(-3)
+        if (lastThree.every((m) => m.content.length < 30)) {
+          isLooping.current = true
+        }
+      }
     } catch (err) {
       console.error('Streaming error:', err)
       if (restoreInputOnError) setInput(restoreInputOnError)
