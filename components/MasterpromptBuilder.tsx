@@ -73,7 +73,7 @@ export default function MasterpromptBuilder() {
     grade: BLOCKS[1].dropdowns[0].options[0],
     subject: BLOCKS[1].dropdowns[1].options[0],
   })
-  const [checkedRestrictions, setCheckedRestrictions] = useState([true, true, false, false])
+  const [checkedRestrictions, setCheckedRestrictions] = useState([true, false, false, false])
   const [loading, setLoading] = useState(false)
 
   function handleChange(key: string, value: string) {
@@ -186,7 +186,6 @@ export default function MasterpromptBuilder() {
                     {RESTRICTION_OPTIONS.map((opt, i) => (
                       <label
                         key={i}
-                        onClick={() => handleRestrictionToggle(i)}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -206,7 +205,7 @@ export default function MasterpromptBuilder() {
                           <input
                             type="checkbox"
                             checked={checkedRestrictions[i]}
-                            onChange={() => {}}
+                            onChange={() => handleRestrictionToggle(i)}
                             style={{ opacity: 0, position: 'absolute', width: 16, height: 16, cursor: 'pointer' }}
                           />
                           <span
