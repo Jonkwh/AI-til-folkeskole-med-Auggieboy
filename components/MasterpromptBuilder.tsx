@@ -182,15 +182,54 @@ export default function MasterpromptBuilder() {
                 </div>
 
                 {block.label === 'BEGRÆNSNING' ? (
-                  <div className="flex flex-col gap-2">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
                     {RESTRICTION_OPTIONS.map((opt, i) => (
-                      <label key={i} className="flex items-center gap-2 cursor-pointer" style={{ fontSize: 13 }}>
-                        <input
-                          type="checkbox"
-                          checked={checkedRestrictions[i]}
-                          onChange={() => handleRestrictionToggle(i)}
-                        />
-                        <span className="text-gray-800 dark:text-gray-200">{opt.label}</span>
+                      <label
+                        key={i}
+                        onClick={() => handleRestrictionToggle(i)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          fontSize: 13,
+                          fontWeight: 400,
+                          lineHeight: 1.5,
+                          cursor: 'pointer',
+                          padding: '4px 8px',
+                          borderRadius: 6,
+                          transition: 'background 0.15s',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.3)' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                      >
+                        <span style={{ position: 'relative', width: 16, height: 16, flexShrink: 0 }}>
+                          <input
+                            type="checkbox"
+                            checked={checkedRestrictions[i]}
+                            onChange={() => {}}
+                            style={{ opacity: 0, position: 'absolute', width: 16, height: 16, cursor: 'pointer' }}
+                          />
+                          <span
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: 16,
+                              height: 16,
+                              borderRadius: 4,
+                              border: checkedRestrictions[i] ? '1.5px solid #D4785A' : '1.5px solid rgba(0,0,0,0.2)',
+                              background: checkedRestrictions[i] ? '#F0997B' : 'rgba(255,255,255,0.6)',
+                              transition: 'all 0.15s',
+                            }}
+                          >
+                            {checkedRestrictions[i] && (
+                              <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                                <path d="M1 3.5L3.5 6L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            )}
+                          </span>
+                        </span>
+                        <span style={{ color: '#1a1a18' }}>{opt.label}</span>
                       </label>
                     ))}
                   </div>
