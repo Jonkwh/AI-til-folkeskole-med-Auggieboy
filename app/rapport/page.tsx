@@ -245,6 +245,10 @@ export default function RapportPage() {
   )
 }
 
+function stripAsterisks(text: string): string {
+  return text.replace(/\*\*/g, '').replace(/\*/g, '').trim()
+}
+
 function Section({
   title,
   content,
@@ -263,7 +267,7 @@ function Section({
         {title}
       </p>
       <p style={{ fontSize: 14, lineHeight: 1.7 }} className="text-gray-600">
-        {content}
+        {stripAsterisks(content)}
       </p>
     </div>
   )

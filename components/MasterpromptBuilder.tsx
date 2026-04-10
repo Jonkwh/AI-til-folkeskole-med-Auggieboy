@@ -46,26 +46,23 @@ const BLOCKS: BlockConfig[] = [
       },
       {
         key: 'subject',
-        options: ['Dansk', 'Engelsk', 'Matematik', 'Historie', 'Samfundsfag', 'Naturfag', 'Alle fag'],
+        options: ['Dansk', 'Engelsk', 'Matematik', 'Historie', 'Samfundsfag', 'Fysik/kemi', 'Biologi', 'Geografi', 'Kristendomskundskab', 'Tysk', 'Fransk', 'Alle fag'],
       },
     ],
   },
   {
     label: 'BEGRÆNSNING',
-    prefix: 'Aldrig ',
+    prefix: '',
     color: { bg: '#F5C4B3', border: '#F0997B', text: '#B8432A' },
-    dropdowns: [
-      {
-        key: 'restriction',
-        options: [
-          'Skriv opgaver eller stile på vegne af eleven',
-          'Afslør svaret uden at eleven har prøvet selv først',
-          'Giv information uden at angive kilder',
-          'Brug sprog som eleven ikke selv kunne have skrevet',
-        ],
-      },
-    ],
+    dropdowns: [],
   },
+]
+
+const RESTRICTION_OPTIONS = [
+  { label: 'Skriv ikke opgaver eller stile på vegne af eleven', prompt: 'skrive opgaver eller stile på vegne af eleven' },
+  { label: 'Afslør ikke svaret uden at eleven har prøvet selv først', prompt: 'afsløre svaret uden at eleven har prøvet selv først' },
+  { label: 'Brug ikke sprog eleven ikke selv kunne have skrevet', prompt: 'bruge sprog eleven ikke selv kunne have skrevet' },
+  { label: 'Giv ikke information uden at nævne kilder', prompt: 'give information uden at nævne kilder' },
 ]
 
 export default function MasterpromptBuilder() {
@@ -75,19 +72,37 @@ export default function MasterpromptBuilder() {
     role: BLOCKS[0].dropdowns[0].options[0],
     grade: BLOCKS[1].dropdowns[0].options[0],
     subject: BLOCKS[1].dropdowns[1].options[0],
-    restriction: BLOCKS[2].dropdowns[0].options[0],
   })
+  const [checkedRestrictions, setCheckedRestrictions] = useState([true, true, false, false])
   const [loading, setLoading] = useState(false)
 
   function handleChange(key: string, value: string) {
     setSelections((prev) => ({ ...prev, [key]: value }))
   }
 
+  function handleRestrictionToggle(index: number) {
+    setCheckedRestrictions((prev) => {
+      const checkedCount = prev.filter(Boolean).length
+      if (prev[index] && checkedCount <= 1) return prev
+      const next = [...prev]
+      next[index] = !next[index]
+      return next
+    })
+  }
+
+  function buildRestrictionText(): string {
+    const selected = RESTRICTION_OPTIONS
+      .filter((_, i) => checkedRestrictions[i])
+      .map((opt) => opt.prompt)
+    if (selected.length === 1) return selected[0]
+    return selected.slice(0, -1).join(', ') + ' og ' + selected[selected.length - 1]
+  }
+
   function assemblePrompt(): string {
     const lines = [
       `AI'en skal ${selections.role}`,
       `for elever i ${selections.grade} i ${selections.subject} i en dansk skole`,
-      `Aldrig ${selections.restriction.toLowerCase()}.`,
+      `Aldrig ${buildRestrictionText()}.`,
     ]
     return lines.join('. \n')
   }
@@ -166,33 +181,48 @@ export default function MasterpromptBuilder() {
                   </span>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium text-gray-800">{block.prefix}</span>
-                  {block.dropdowns.map((dropdown, dIdx) => (
-                    <span key={dropdown.key} className="flex items-center gap-2">
-                      {dIdx > 0 && (
-                        <span className="text-sm text-gray-600">
-                          {block.label === 'KONTEKST' ? 'i' : ''}
-                        </span>
-                      )}
-                      <select
-                        value={selections[dropdown.key]}
-                        onChange={(e) => handleChange(dropdown.key, e.target.value)}
-                        className="text-sm rounded-lg px-3 py-1.5 bg-white dark:bg-[#3e3e42] border border-gray-300 dark:border-[#3e3e42] text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-1"
-                        style={{ focusRingColor: block.color.border } as React.CSSProperties}
-                      >
-                        {dropdown.options.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                    </span>
-                  ))}
-                  {block.suffix && (
-                    <span className="text-sm font-medium text-gray-800">{block.suffix}</span>
-                  )}
-                </div>
+                {block.label === 'BEGRÆNSNING' ? (
+                  <div className="flex flex-col gap-2">
+                    {RESTRICTION_OPTIONS.map((opt, i) => (
+                      <label key={i} className="flex items-center gap-2 cursor-pointer" style={{ fontSize: 13 }}>
+                        <input
+                          type="checkbox"
+                          checked={checkedRestrictions[i]}
+                          onChange={() => handleRestrictionToggle(i)}
+                        />
+                        <span className="text-gray-800 dark:text-gray-200">{opt.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium text-gray-800">{block.prefix}</span>
+                    {block.dropdowns.map((dropdown, dIdx) => (
+                      <span key={dropdown.key} className="flex items-center gap-2">
+                        {dIdx > 0 && (
+                          <span className="text-sm text-gray-600">
+                            {block.label === 'KONTEKST' ? 'i' : ''}
+                          </span>
+                        )}
+                        <select
+                          value={selections[dropdown.key]}
+                          onChange={(e) => handleChange(dropdown.key, e.target.value)}
+                          className="text-sm rounded-lg px-3 py-1.5 bg-white dark:bg-[#3e3e42] border border-gray-300 dark:border-[#3e3e42] text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-1"
+                          style={{ focusRingColor: block.color.border } as React.CSSProperties}
+                        >
+                          {dropdown.options.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                      </span>
+                    ))}
+                    {block.suffix && (
+                      <span className="text-sm font-medium text-gray-800">{block.suffix}</span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -226,7 +256,7 @@ export default function MasterpromptBuilder() {
                   className="rounded px-1.5 py-0.5 font-medium"
                   style={{ backgroundColor: BLOCKS[2].color.bg }}
                 >
-                  Aldrig {selections.restriction.toLowerCase()}
+                  Aldrig {buildRestrictionText()}
                 </span>
               </p>
             </div>
