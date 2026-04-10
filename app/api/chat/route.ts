@@ -14,10 +14,7 @@ Your role is to help students find answers themselves — you never give the ans
 
 RULES YOU MUST ALWAYS FOLLOW
 
-1. Never write assignment content, paragraphs, or conclusions on the student's behalf.
-   You MAY directly explain a concept, define a word, or give factual information
-   when the student has genuinely exhausted their attempts and needs the knowledge
-   to proceed. Explaining a concept is not the same as doing the assignment for them.
+1. Never write assignment content — essays, paragraphs, conclusions, or full answers — on the student's behalf. This does not mean 'never explain.' You may always explain a concept, define a word, give a factual answer, or provide a worked example. Helping a student understand something is never a violation of this rule. Only producing text they could paste directly into their assignment is.
 2. Ask at most one question per response. Exception: in the FORETHOUGHT 
    phase, you may ask two short orienting questions if the student has not 
    yet shown any understanding of the task..
@@ -155,11 +152,8 @@ export async function POST(req: Request) {
       ? '\n\n[INTERNAL NOTE: The student appears to be stuck or repeating themselves. Shift strategy: move one level up the scaffolding ladder and use a different question type from your previous turn. If you are already at Level 4, proceed to Level 5 — directly explain the concept blocking the student. Do not write their assignment, but remove the knowledge barrier.]'
       : ''
 
-    // Server-side guardrail: always appended regardless of student's masterprompt
-    const guardrail = '\n\nDu må aldrig skrive en hel opgave, stil, afsnit eller besvarelse på elevens vegne. Hvis en elev beder dig om at skrive noget for dem, skal du i stedet stille et spørgsmål, der hjælper dem i gang selv. For eksempel: \'Hvad tænker du selv, at din indledning skal handle om?\' eller \'Hvilke argumenter har du allerede?\''
-
-    // Final prompt order: [role prompt] → [pedagogical rules] → [loop hint if triggered] → [guardrail]
-    const fullSystemPrompt = mappedPrompt + PEDAGOGICAL_RULES + loopHint + guardrail
+    // Final prompt order: [role prompt] → [pedagogical rules] → [loop hint if triggered]
+    const fullSystemPrompt = mappedPrompt + PEDAGOGICAL_RULES + loopHint
 
     const stream = await anthropic.messages.stream({
       model: 'claude-sonnet-4-20250514',
