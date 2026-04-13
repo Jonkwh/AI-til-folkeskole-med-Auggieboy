@@ -592,6 +592,8 @@ export default function ChatInterface({
                       </button>
                     )
                   })}
+                </div>
+                <div>
                   <button
                     onClick={() => textareaRef.current?.focus()}
                     className="border border-dashed border-[var(--border)] rounded-xl px-4 py-2 text-sm text-left transition-colors bg-[var(--bg-card)] hover:bg-[var(--bg-surface)] cursor-pointer"
@@ -641,6 +643,8 @@ export default function ChatInterface({
                           </button>
                         )
                       })}
+                    </div>
+                    <div>
                       <button
                         onClick={() => textareaRef.current?.focus()}
                         className="border border-dashed border-[var(--border)] rounded-xl px-4 py-2 text-sm text-left transition-colors bg-[var(--bg-card)] hover:bg-[var(--bg-surface)] cursor-pointer"
@@ -771,7 +775,7 @@ export default function ChatInterface({
             placeholder={inputPlaceholder}
             disabled={inputDisabled}
             rows={1}
-            className="flex-1 resize-none rounded-xl border border-[var(--border)] bg-[var(--bg-input)] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 resize-none rounded-xl border border-[var(--border)] bg-[var(--bg-input)] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-400 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
           />
           <button
             type="submit"
