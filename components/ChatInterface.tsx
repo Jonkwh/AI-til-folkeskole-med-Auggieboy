@@ -595,9 +595,9 @@ export default function ChatInterface({
                   <button
                     onClick={() => textareaRef.current?.focus()}
                     className="border border-dashed border-[var(--border)] rounded-xl px-4 py-2 text-sm text-left transition-colors bg-[var(--bg-card)] hover:bg-[var(--bg-surface)] cursor-pointer"
-                    style={{ color: 'var(--color-text-tertiary)' }}
+                    style={{ color: 'var(--color-text-tertiary)', opacity: 0.7 }}
                   >
-                    Noget andet...
+                    <em>Skriv noget selv</em>
                   </button>
                 </div>
 
@@ -644,9 +644,9 @@ export default function ChatInterface({
                       <button
                         onClick={() => textareaRef.current?.focus()}
                         className="border border-dashed border-[var(--border)] rounded-xl px-4 py-2 text-sm text-left transition-colors bg-[var(--bg-card)] hover:bg-[var(--bg-surface)] cursor-pointer"
-                        style={{ color: 'var(--color-text-tertiary)' }}
+                        style={{ color: 'var(--color-text-tertiary)', opacity: 0.7 }}
                       >
-                        Noget andet...
+                        <em>Skriv noget selv</em>
                       </button>
                     </div>
 
