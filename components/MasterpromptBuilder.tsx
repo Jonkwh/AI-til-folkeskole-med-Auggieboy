@@ -60,10 +60,10 @@ const BLOCKS: BlockConfig[] = [
 
 const RESTRICTION_OPTIONS = [
   { label: 'Brug kun eksempler fra den tekst eller det emne, eleven arbejder med', prompt: 'bruge eksempler fra andre tekster eller emner end dem eleven arbejder med' },
-  { label: 'Svar kun på dansk — skift ikke til et andet sprog, selvom eleven gør det', prompt: 'skifte til et andet sprog end dansk, selvom eleven gør det' },
+  { label: 'Svar kun på dansk. Skift ikke til et andet sprog, selvom eleven gør det', prompt: 'skifte til et andet sprog end dansk, selvom eleven gør det' },
   { label: 'Giv ikke eksempler fra andre forfattere, film eller tekster end dem eleven selv nævner', prompt: 'give eksempler fra forfattere, film eller tekster som eleven ikke selv har nævnt' },
   { label: 'Brug aldrig fagtermer uden at forklare dem først', prompt: 'bruge fagtermer uden at forklare dem først' },
-  { label: 'Hold dig til det emne eller den tekst, eleven nævner i starten — gå ikke videre til andre emner', prompt: 'gå videre til andre emner end det emne eller den tekst, eleven nævner i starten' },
+  { label: 'Hold dig til det emne eller den tekst, eleven nævner i starten, og gå ikke videre til andre emner', prompt: 'gå videre til andre emner end det emne eller den tekst, eleven nævner i starten' },
 ]
 
 export default function MasterpromptBuilder() {
