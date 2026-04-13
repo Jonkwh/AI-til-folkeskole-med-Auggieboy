@@ -59,10 +59,11 @@ const BLOCKS: BlockConfig[] = [
 ]
 
 const RESTRICTION_OPTIONS = [
-  { label: 'Skriv ikke opgaver eller stile på vegne af eleven', prompt: 'skrive opgaver eller stile på vegne af eleven' },
-  { label: 'Afslør ikke svaret uden at eleven har prøvet selv først', prompt: 'afsløre svaret uden at eleven har prøvet selv først' },
-  { label: 'Brug ikke sprog eleven ikke selv kunne have skrevet', prompt: 'bruge sprog eleven ikke selv kunne have skrevet' },
-  { label: 'Giv ikke information uden at nævne kilder', prompt: 'give information uden at nævne kilder' },
+  { label: 'Brug kun eksempler fra den tekst eller det emne, eleven arbejder med', prompt: 'bruge eksempler fra andre tekster eller emner end dem eleven arbejder med' },
+  { label: 'Svar kun på dansk — skift ikke til et andet sprog, selvom eleven gør det', prompt: 'skifte til et andet sprog end dansk, selvom eleven gør det' },
+  { label: 'Giv ikke eksempler fra andre forfattere, film eller tekster end dem eleven selv nævner', prompt: 'give eksempler fra forfattere, film eller tekster som eleven ikke selv har nævnt' },
+  { label: 'Brug aldrig fagtermer uden at forklare dem først', prompt: 'bruge fagtermer uden at forklare dem først' },
+  { label: 'Hold dig til det emne eller den tekst, eleven nævner i starten — gå ikke videre til andre emner', prompt: 'gå videre til andre emner end det emne eller den tekst, eleven nævner i starten' },
 ]
 
 export default function MasterpromptBuilder() {
@@ -73,7 +74,7 @@ export default function MasterpromptBuilder() {
     grade: BLOCKS[1].dropdowns[0].options[0],
     subject: BLOCKS[1].dropdowns[1].options[0],
   })
-  const [checkedRestrictions, setCheckedRestrictions] = useState([true, false, false, false])
+  const [checkedRestrictions, setCheckedRestrictions] = useState([true, false, false, false, false])
   const [loading, setLoading] = useState(false)
 
   function handleChange(key: string, value: string) {
