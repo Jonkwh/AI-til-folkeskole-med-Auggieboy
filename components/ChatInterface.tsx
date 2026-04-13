@@ -414,20 +414,29 @@ export default function ChatInterface({
       return
     }
 
-    // Handle freetext submission during onboarding — treat typed text as the
-    // onboarding answer, assemble context, and mark onboarding complete so the
-    // normal message flow below injects context on the first call.
+    // Handle freetext submission during onboarding.
     if (!onboardingComplete && onboardingSteps) {
       if (!step1Answer) {
-        // Freetext during step 1 — skip step 2, use partial context
-        const context = `[STUDENT CONTEXT: ${onboardingSteps[0].question}: ${userMessage}.]`
-        studentContextRef.current = context
+        // Free text during step 1 — treat as a card selection and show step 2.
+        // Do not fire the API yet; step 2 cards will appear via state update.
+        setStep1Answer(userMessage)
+        setInput('')
+        return
       } else if (!step2Answer) {
-        // Freetext during step 2 — assemble full context
+        // Free text during step 2 — complete onboarding exactly as a card
+        // selection would: assemble full context, fire API, return early.
         const context = `[STUDENT CONTEXT: ${onboardingSteps[0].question}: ${step1Answer}. ${onboardingSteps[1].question}: ${userMessage}.]`
-        studentContextRef.current = context
+        setStep2Answer(userMessage)
+        setOnboardingComplete(true)
+        setInput('')
+        const displayLabel = `${step1Answer} — ${userMessage}`
+        const newHiddenMsg: Message = { role: 'user', content: displayLabel, created_at: new Date().toISOString(), isHidden: true }
+        setMessages((prev) => [...prev, newHiddenMsg])
+        await saveMessage('user', displayLabel)
+        updateSessionTitle(displayLabel)
+        await callChatAPI([{ role: 'user', content: context }])
+        return
       }
-      setOnboardingComplete(true)
     }
 
     // Update title from first user message.
@@ -583,6 +592,13 @@ export default function ChatInterface({
                       </button>
                     )
                   })}
+                  <button
+                    onClick={() => textareaRef.current?.focus()}
+                    className="border border-dashed border-[var(--border)] rounded-xl px-4 py-2 text-sm text-left transition-colors bg-[var(--bg-card)] hover:bg-[var(--bg-surface)] cursor-pointer"
+                    style={{ color: 'var(--color-text-tertiary)' }}
+                  >
+                    Noget andet...
+                  </button>
                 </div>
 
                 {/* Helper text — only visible while onboarding is incomplete */}
@@ -625,6 +641,13 @@ export default function ChatInterface({
                           </button>
                         )
                       })}
+                      <button
+                        onClick={() => textareaRef.current?.focus()}
+                        className="border border-dashed border-[var(--border)] rounded-xl px-4 py-2 text-sm text-left transition-colors bg-[var(--bg-card)] hover:bg-[var(--bg-surface)] cursor-pointer"
+                        style={{ color: 'var(--color-text-tertiary)' }}
+                      >
+                        Noget andet...
+                      </button>
                     </div>
 
                     {/* Helper text — only visible while onboarding is incomplete */}
