@@ -45,7 +45,7 @@ const RE_ENGAGEMENT_OPTIONS = [
 
 const RE_ENGAGEMENT_PROMPTS: Record<string, string> = {
   'Giv mig et hint':
-    '\n\n[INTERNAL NOTE: The student has requested a hint. Move to the next level on the scaffolding ladder.]',
+    '\n\n[INTERNAL NOTE — OVERRIDE: The student has explicitly clicked a button requesting a hint. Do NOT ask whether they want a hint. Do NOT ask a clarifying question. Give a concrete, specific hint immediately in this response. A hint means narrowing the problem space with a specific piece of information or a concrete example — not a question. After the hint, you may ask one short follow-up question.]',
   'Prøv et nyt spørgsmål':
     '\n\n[INTERNAL NOTE: The student wants a different angle. Keep the same scaffolding level but rotate to a different question type from your previous turn.]',
   'Forklar konceptet':
@@ -119,6 +119,9 @@ export default function ChatInterface({
   // Tracks whether the student appears to be looping. Set after each bot response,
   // read on the next send, and cleared automatically when topics diverge.
   const isLooping = useRef(false)
+  // Blocks isLooping from being set to true for N more student messages after a
+  // re-engagement card is selected, preventing back-to-back card appearances.
+  const reEngagementCooldownRef = useRef(0)
   const isNewChat = initialMessages.length === 0
 
   // ── Onboarding ─────────────────────────────────────────────────────────────
@@ -295,8 +298,14 @@ export default function ChatInterface({
         // question, not loops — skip the similarity check entirely.
         if (last.length <= 15 || secondLast.length <= 15) {
           isLooping.current = false
+        } else if (wordOverlapSimilarity(last, secondLast) > LOOP_SIMILARITY_THRESHOLD) {
+          if (reEngagementCooldownRef.current > 0) {
+            reEngagementCooldownRef.current -= 1
+          } else {
+            isLooping.current = true
+          }
         } else {
-          isLooping.current = wordOverlapSimilarity(last, secondLast) > LOOP_SIMILARITY_THRESHOLD
+          isLooping.current = false
         }
       } else {
         isLooping.current = false
@@ -310,7 +319,11 @@ export default function ChatInterface({
         if (allShort) {
           const lowInfoCount = lastThree.filter((m) => isLowInfo(m.content)).length
           if (lowInfoCount >= 2) {
-            isLooping.current = true
+            if (reEngagementCooldownRef.current > 0) {
+              reEngagementCooldownRef.current -= 1
+            } else {
+              isLooping.current = true
+            }
           }
         }
       }
@@ -367,6 +380,7 @@ export default function ChatInterface({
       prev.map((re) => (re.afterIndex === afterIndex ? { ...re, selectedOption: option } : re))
     )
     isLooping.current = false
+    reEngagementCooldownRef.current = 2
 
     // Append the per-choice instruction to the system prompt for this single
     // call only. It is not stored and does not affect any subsequent calls.
