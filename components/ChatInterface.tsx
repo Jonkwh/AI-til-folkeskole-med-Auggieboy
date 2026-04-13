@@ -292,11 +292,21 @@ export default function ChatInterface({
         isLooping.current = false
       }
       // Also trigger loop detection if the last 3 student messages are all under
-      // 30 characters — catches stuck/confused patterns without lexical repetition.
+      // 30 characters AND at least 2 of them are low-information. This prevents
+      // false positives from short but substantive answers.
       if (userMsgs.length >= 3) {
         const lastThree = userMsgs.slice(-3)
-        if (lastThree.every((m) => m.content.length < 30)) {
-          isLooping.current = true
+        const allShort = lastThree.every((m) => m.content.length < 30)
+        if (allShort) {
+          const LOW_INFO_PATTERNS = /ved\s+(det\s+)?ikke|forstår\s+(det\s+)?ikke|ingen\s+ide|ikke\s+sikker|^nej$|^hvad$|^hva$/i
+          const isLowInfo = (msg: string) =>
+            msg.trim().length <= 15 ||
+            LOW_INFO_PATTERNS.test(msg.trim()) ||
+            !/\s/.test(msg.trim())
+          const lowInfoCount = lastThree.filter((m) => isLowInfo(m.content)).length
+          if (lowInfoCount >= 2) {
+            isLooping.current = true
+          }
         }
       }
     } catch (err) {
