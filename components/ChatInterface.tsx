@@ -75,6 +75,16 @@ const ASSIGNMENT_PATTERNS = [
   /afslut\s+min/i,
 ]
 
+// Patterns that indicate a low-information student response.
+const LOW_INFO_PATTERNS = /ved\s+(det\s+)?ikke|forstår\s+(det\s+)?ikke|ingen\s+ide|ikke\s+sikker|^nej$|^hvad$|^hva$/i
+
+// Returns true if a message carries little informational content.
+// Used by both the 30-character loop check and the handleSubmit early reset.
+function isLowInfo(msg: string): boolean {
+  const t = msg.trim()
+  return t.length <= 15 || LOW_INFO_PATTERNS.test(t) || !/\s/.test(t)
+}
+
 // Jaccard similarity between two messages based on word overlap. Returns 0–1.
 // Avoids Set spread to stay compatible with the project's TS/target config.
 function wordOverlapSimilarity(a: string, b: string): number {
@@ -298,11 +308,6 @@ export default function ChatInterface({
         const lastThree = userMsgs.slice(-3)
         const allShort = lastThree.every((m) => m.content.length < 30)
         if (allShort) {
-          const LOW_INFO_PATTERNS = /ved\s+(det\s+)?ikke|forstår\s+(det\s+)?ikke|ingen\s+ide|ikke\s+sikker|^nej$|^hvad$|^hva$/i
-          const isLowInfo = (msg: string) =>
-            msg.trim().length <= 15 ||
-            LOW_INFO_PATTERNS.test(msg.trim()) ||
-            !/\s/.test(msg.trim())
           const lowInfoCount = lastThree.filter((m) => isLowInfo(m.content)).length
           if (lowInfoCount >= 2) {
             isLooping.current = true
@@ -422,6 +427,12 @@ export default function ChatInterface({
     setMessages((prev) => [...prev, newUserMsg])
     await saveMessage('user', userMessage)
     setInput('')
+
+    // If the student's current message is substantive, clear any stale loop flag
+    // before deciding whether to show re-engagement cards.
+    if (!isLowInfo(userMessage)) {
+      isLooping.current = false
+    }
 
     // If the student appears to be looping, pause the API call and show the
     // re-engagement card flow instead. The afterIndex points to the position
