@@ -45,7 +45,7 @@ const RE_ENGAGEMENT_OPTIONS = [
 
 const RE_ENGAGEMENT_PROMPTS: Record<string, string> = {
   'Giv mig et hint':
-    '\n\n[INTERNAL NOTE: The student has requested a hint. Move to the next level on the scaffolding ladder.]',
+    '\n\n[INTERNAL NOTE — OVERRIDE: The student has explicitly clicked a button requesting a hint. Do NOT ask whether they want a hint. Do NOT ask a clarifying question. Give a concrete, specific hint immediately in this response. A hint means narrowing the problem space with a specific piece of information or a concrete example — not a question. After the hint, you may ask one short follow-up question.]',
   'Prøv et nyt spørgsmål':
     '\n\n[INTERNAL NOTE: The student wants a different angle. Keep the same scaffolding level but rotate to a different question type from your previous turn.]',
   'Forklar konceptet':
@@ -74,6 +74,16 @@ const ASSIGNMENT_PATTERNS = [
   /færdiggør\s+min/i,
   /afslut\s+min/i,
 ]
+
+// Patterns that indicate a low-information student response.
+const LOW_INFO_PATTERNS = /ved\s+(det\s+)?ikke|forstår\s+(det\s+)?ikke|ingen\s+ide|ikke\s+sikker|^nej$|^hvad$|^hva$/i
+
+// Returns true if a message carries little informational content.
+// Used by both the 30-character loop check and the handleSubmit early reset.
+function isLowInfo(msg: string): boolean {
+  const t = msg.trim()
+  return t.length <= 15 || LOW_INFO_PATTERNS.test(t) || !/\s/.test(t)
+}
 
 // Jaccard similarity between two messages based on word overlap. Returns 0–1.
 // Avoids Set spread to stay compatible with the project's TS/target config.
@@ -109,6 +119,9 @@ export default function ChatInterface({
   // Tracks whether the student appears to be looping. Set after each bot response,
   // read on the next send, and cleared automatically when topics diverge.
   const isLooping = useRef(false)
+  // Blocks isLooping from being set to true for N more student messages after a
+  // re-engagement card is selected, preventing back-to-back card appearances.
+  const reEngagementCooldownRef = useRef(0)
   const isNewChat = initialMessages.length === 0
 
   // ── Onboarding ─────────────────────────────────────────────────────────────
@@ -285,11 +298,34 @@ export default function ChatInterface({
         // question, not loops — skip the similarity check entirely.
         if (last.length <= 15 || secondLast.length <= 15) {
           isLooping.current = false
+        } else if (wordOverlapSimilarity(last, secondLast) > LOOP_SIMILARITY_THRESHOLD) {
+          if (reEngagementCooldownRef.current > 0) {
+            reEngagementCooldownRef.current -= 1
+          } else {
+            isLooping.current = true
+          }
         } else {
-          isLooping.current = wordOverlapSimilarity(last, secondLast) > LOOP_SIMILARITY_THRESHOLD
+          isLooping.current = false
         }
       } else {
         isLooping.current = false
+      }
+      // Also trigger loop detection if the last 3 student messages are all under
+      // 30 characters AND at least 2 of them are low-information. This prevents
+      // false positives from short but substantive answers.
+      if (userMsgs.length >= 3) {
+        const lastThree = userMsgs.slice(-3)
+        const allShort = lastThree.every((m) => m.content.length < 30)
+        if (allShort) {
+          const lowInfoCount = lastThree.filter((m) => isLowInfo(m.content)).length
+          if (lowInfoCount >= 2) {
+            if (reEngagementCooldownRef.current > 0) {
+              reEngagementCooldownRef.current -= 1
+            } else {
+              isLooping.current = true
+            }
+          }
+        }
       }
     } catch (err) {
       console.error('Streaming error:', err)
@@ -344,6 +380,7 @@ export default function ChatInterface({
       prev.map((re) => (re.afterIndex === afterIndex ? { ...re, selectedOption: option } : re))
     )
     isLooping.current = false
+    reEngagementCooldownRef.current = 2
 
     // Append the per-choice instruction to the system prompt for this single
     // call only. It is not stored and does not affect any subsequent calls.
@@ -404,6 +441,12 @@ export default function ChatInterface({
     setMessages((prev) => [...prev, newUserMsg])
     await saveMessage('user', userMessage)
     setInput('')
+
+    // If the student's current message is substantive, clear any stale loop flag
+    // before deciding whether to show re-engagement cards.
+    if (!isLowInfo(userMessage)) {
+      isLooping.current = false
+    }
 
     // If the student appears to be looping, pause the API call and show the
     // re-engagement card flow instead. The afterIndex points to the position
