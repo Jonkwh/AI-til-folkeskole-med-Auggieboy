@@ -128,6 +128,8 @@ export default function ChatInterface({
   // onboardingFetchedRef is set synchronously before the first async tick to
   // prevent double-fetching in React Strict Mode's double-invocation of effects.
   const onboardingFetchedRef = useRef(false)
+  // Guards the dynamic step 2 fetch triggered by free-text step 1 submission.
+  const step2FetchedRef = useRef(false)
   // Holds the assembled [STUDENT CONTEXT: ...] string until it is injected into
   // the first real API call, after which it is no longer read.
   const studentContextRef = useRef('')
@@ -138,6 +140,10 @@ export default function ChatInterface({
   const [step2Answer, setStep2Answer] = useState<string | null>(null)
   // Initialised to true for returning users (no onboarding needed).
   const [onboardingComplete, setOnboardingComplete] = useState(!isNewChat)
+  // Holds the dynamically generated step 2 when the student typed free text at step 1.
+  // Null means card selection was used — fall back to pre-generated onboardingSteps[1].
+  const [dynamicStep2, setDynamicStep2] = useState<OnboardingStep | null>(null)
+  const [step2Loading, setStep2Loading] = useState(false)
 
   // ── Re-engagement ───────────────────────────────────────────────────────────
   // Each entry is positioned at a specific index in the messages array so the
@@ -353,8 +359,9 @@ export default function ChatInterface({
   async function handleStep2Select(option: string) {
     if (!onboardingSteps || !step1Answer) return
     setStep2Answer(option)
+    const activeStep2 = dynamicStep2 ?? onboardingSteps[1]
     // Full context string — sent to the API only, never stored or rendered.
-    const context = `[STUDENT CONTEXT: ${onboardingSteps[0].question}: ${step1Answer}. ${onboardingSteps[1].question}: ${option}.]`
+    const context = `[STUDENT CONTEXT: ${onboardingSteps[0].question}: ${step1Answer}. ${activeStep2.question}: ${option}.]`
     // Mark as consumed so handleSubmit never injects it on a subsequent call.
     studentContextRef.current = ''
     setOnboardingComplete(true)
@@ -417,15 +424,46 @@ export default function ChatInterface({
     // Handle freetext submission during onboarding.
     if (!onboardingComplete && onboardingSteps) {
       if (!step1Answer) {
-        // Free text during step 1 — treat as a card selection and show step 2.
-        // Do not fire the API yet; step 2 cards will appear via state update.
+        // Free text during step 1 — set answer and fetch a dynamic step 2
+        // question tailored to what the student actually wrote.
         setStep1Answer(userMessage)
         setInput('')
+        if (!step2FetchedRef.current) {
+          step2FetchedRef.current = true
+          setStep2Loading(true)
+          fetch('/api/onboarding', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ systemPrompt: masterprompt, step1Answer: userMessage }),
+          })
+            .then((res) => {
+              if (!res.ok) throw new Error('Step 2 fetch failed')
+              return res.json()
+            })
+            .then((data) => {
+              if (data.question && Array.isArray(data.options)) {
+                setDynamicStep2({ question: data.question, options: data.options })
+              } else {
+                setDynamicStep2({
+                  question: 'Hvad ville hjælpe dig mest?',
+                  options: ['Forstå opgaven bedre', 'Komme i gang med at skrive', 'Få et konkret eksempel'],
+                })
+              }
+            })
+            .catch(() => {
+              setDynamicStep2({
+                question: 'Hvad ville hjælpe dig mest?',
+                options: ['Forstå opgaven bedre', 'Komme i gang med at skrive', 'Få et konkret eksempel'],
+              })
+            })
+            .finally(() => setStep2Loading(false))
+        }
         return
       } else if (!step2Answer) {
         // Free text during step 2 — complete onboarding exactly as a card
         // selection would: assemble full context, fire API, return early.
-        const context = `[STUDENT CONTEXT: ${onboardingSteps[0].question}: ${step1Answer}. ${onboardingSteps[1].question}: ${userMessage}.]`
+        const activeStep2 = dynamicStep2 ?? onboardingSteps[1]
+        const context = `[STUDENT CONTEXT: ${onboardingSteps[0].question}: ${step1Answer}. ${activeStep2.question}: ${userMessage}.]`
         setStep2Answer(userMessage)
         setOnboardingComplete(true)
         setInput('')
@@ -620,45 +658,60 @@ export default function ChatInterface({
                       </div>
                     </div>
 
-                    {/* Step 2: bot question */}
+                    {/* Step 2: loading while dynamic question is being fetched */}
+                    {step2Loading && (
+                      <div className="flex justify-start animate-fade-in">
+                        <div className="max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed bg-[var(--bg-panel)] text-gray-500 dark:text-gray-400 italic">
+                          Henter spørgsmål...
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Step 2: bot question — shown once loading is done */}
+                    {!step2Loading && (
                     <div className="flex justify-start">
                       <div className="max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed bg-[var(--bg-panel)] text-gray-800 dark:text-gray-200">
-                        {onboardingSteps[1].question}
+                        {(dynamicStep2 ?? onboardingSteps[1]).question}
                       </div>
                     </div>
+                    )}
 
-                    {/* Step 2: option cards */}
-                    <div className="flex flex-wrap gap-2">
-                      {onboardingSteps[1].options.map((option) => {
-                        const isSelected = step2Answer === option
-                        const isFaded = !!step2Answer && !isSelected
-                        return (
+                    {/* Step 2: option cards, write-yourself button, and helper — shown once loading is done */}
+                    {!step2Loading && (
+                      <>
+                        <div className="flex flex-wrap gap-2">
+                          {(dynamicStep2 ?? onboardingSteps[1]).options.map((option) => {
+                            const isSelected = step2Answer === option
+                            const isFaded = !!step2Answer && !isSelected
+                            return (
+                              <button
+                                key={option}
+                                onClick={() => !step2Answer && handleStep2Select(option)}
+                                className={cardClasses(isSelected, isFaded, !step2Answer)}
+                                style={cardStyle(isSelected, isFaded)}
+                              >
+                                {option}
+                              </button>
+                            )
+                          })}
+                        </div>
+                        <div>
                           <button
-                            key={option}
-                            onClick={() => !step2Answer && handleStep2Select(option)}
-                            className={cardClasses(isSelected, isFaded, !step2Answer)}
-                            style={cardStyle(isSelected, isFaded)}
+                            onClick={() => textareaRef.current?.focus()}
+                            className="border border-dashed border-[var(--border)] rounded-xl px-4 py-2 text-sm text-left transition-colors bg-[var(--bg-card)] hover:bg-[var(--bg-surface)] cursor-pointer"
+                            style={{ color: 'var(--color-text-tertiary)', opacity: 0.7 }}
                           >
-                            {option}
+                            <em>Skriv noget selv</em>
                           </button>
-                        )
-                      })}
-                    </div>
-                    <div>
-                      <button
-                        onClick={() => textareaRef.current?.focus()}
-                        className="border border-dashed border-[var(--border)] rounded-xl px-4 py-2 text-sm text-left transition-colors bg-[var(--bg-card)] hover:bg-[var(--bg-surface)] cursor-pointer"
-                        style={{ color: 'var(--color-text-tertiary)', opacity: 0.7 }}
-                      >
-                        <em>Skriv noget selv</em>
-                      </button>
-                    </div>
+                        </div>
 
-                    {/* Helper text — only visible while onboarding is incomplete */}
-                    {!onboardingComplete && (
-                      <p className="text-xs text-gray-400 dark:text-gray-500 pt-1">
-                        Vælg en mulighed, eller skriv dit eget svar nedenfor
-                      </p>
+                        {/* Helper text — only visible while onboarding is incomplete */}
+                        {!onboardingComplete && (
+                          <p className="text-xs text-gray-400 dark:text-gray-500 pt-1">
+                            Vælg en mulighed, eller skriv dit eget svar nedenfor
+                          </p>
+                        )}
+                      </>
                     )}
 
                     {/* Student bubble for step 2 */}
