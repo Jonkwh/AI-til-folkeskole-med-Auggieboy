@@ -74,7 +74,7 @@ export default function Sidebar() {
   }
 
   async function saveRename(sessionId: string) {
-    const trimmed = editTitle.trim()
+    const trimmed = editTitle.trim().replace(/—/g, '-')
     if (!trimmed) {
       // Revert if empty
       setEditingId(null)

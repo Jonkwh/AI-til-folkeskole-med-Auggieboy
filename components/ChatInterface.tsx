@@ -212,7 +212,8 @@ export default function ChatInterface({
   }
 
   async function updateSessionTitle(firstMessage: string) {
-    const newTitle = firstMessage.slice(0, 40) + (firstMessage.length > 40 ? '...' : '')
+    const sanitized = firstMessage.replace(/—/g, '-')
+    const newTitle = sanitized.slice(0, 40) + (sanitized.length > 40 ? '...' : '')
     setTitle(newTitle)
     await supabase
       .from('chat_sessions')
@@ -281,7 +282,7 @@ export default function ChatInterface({
         while (true) {
           const { done, value } = await reader.read()
           if (done) break
-          const chunk = decoder.decode(value, { stream: true })
+          const chunk = decoder.decode(value, { stream: true }).replace(/—/g, '-')
           fullContent += chunk
           setMessages((prev) => {
             const updated = [...prev]
@@ -368,7 +369,7 @@ export default function ChatInterface({
 
     // Display label shown in the student bubble and saved to Supabase.
     // The raw bracketed context string is API-only.
-    const displayLabel = `${step1Answer} — ${option}`
+    const displayLabel = `${step1Answer} - ${option}`
     const newUserMsg: Message = { role: 'user', content: displayLabel, created_at: new Date().toISOString(), isHidden: true }
     setMessages((prev) => [...prev, newUserMsg])
     await saveMessage('user', displayLabel)
@@ -413,7 +414,7 @@ export default function ChatInterface({
 
     if (!checkRateLimit()) return
 
-    const userMessage = input.trim()
+    const userMessage = input.trim().replace(/—/g, '-')
 
     // Client-side guardrail: check for assignment writing requests
     if (ASSIGNMENT_PATTERNS.some((p) => p.test(userMessage))) {
