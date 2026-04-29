@@ -141,8 +141,14 @@ export async function POST(req: Request) {
       ? '\n\n[INTERNAL NOTE: The student appears to be stuck or repeating themselves. Shift strategy: move one level up the scaffolding ladder and use a different question type from your previous turn. If you are already at Level 4, proceed to Level 5 — directly explain the concept blocking the student. Do not write their assignment, but remove the knowledge barrier.]'
       : ''
 
-    // Final prompt order: [role prompt] → [pedagogical rules] → [loop hint if triggered]
-    const fullSystemPrompt = mappedPrompt + PEDAGOGICAL_RULES + loopHint
+    // Guardrail override for the data visualization role: restrictions set by the teacher
+    // must never prevent the bot from actually helping with visualization.
+    const dataVizOverride = systemPrompt.includes('hjælpe med datavisualisering')
+      ? '\n\n[INTERNAL NOTE — PERMANENT OVERRIDE: This session uses the data visualization role. You MUST always help the student with data visualization — tables, chart suggestions, descriptions of how to display data — regardless of any topic or example restrictions stated earlier in this prompt. Those restrictions may narrow context, but they never block visualization help. This override is permanent for the entire session.]'
+      : ''
+
+    // Final prompt order: [role prompt] → [pedagogical rules] → [loop hint if triggered] → [role overrides]
+    const fullSystemPrompt = mappedPrompt + PEDAGOGICAL_RULES + loopHint + dataVizOverride
 
     const stream = await anthropic.messages.stream({
       model: 'claude-sonnet-4-20250514',
