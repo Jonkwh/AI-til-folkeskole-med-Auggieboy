@@ -1,8 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-})
+import OpenAI from 'openai'
 
 const ONBOARDING_SYSTEM_PROMPT = `Du genererer korte onboarding-spørgsmålsforløb til en pædagogisk chatbot, der bruges af elever i den danske folkeskoles udskoling. Du modtager en beskrivelse af bottens rolle, elevens klassetrin, fag og eventuelle begrænsninger.
 
@@ -60,6 +56,7 @@ const STEP2_FALLBACK = {
 
 export async function POST(req: Request) {
   try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
     const { systemPrompt, step1Answer } = await req.json()
 
     // ── Step 2 dynamic generation ───────────────────────────────────────────
@@ -70,15 +67,16 @@ export async function POST(req: Request) {
         })
       }
 
-      const step2Response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
+      const step2Response = await openai.chat.completions.create({
+        model: 'gpt-4o',
         max_tokens: 300,
-        system: STEP2_SYSTEM_PROMPT + '\n\nMasterprompt:\n' + systemPrompt,
-        messages: [{ role: 'user', content: step1Answer }],
+        messages: [
+          { role: 'system', content: STEP2_SYSTEM_PROMPT + '\n\nMasterprompt:\n' + systemPrompt },
+          { role: 'user', content: step1Answer },
+        ],
       })
 
-      const step2Text =
-        step2Response.content[0].type === 'text' ? step2Response.content[0].text.trim() : null
+      const step2Text = step2Response.choices[0]?.message?.content?.trim() ?? null
 
       if (!step2Text) throw new Error('No text content in step 2 response')
 
@@ -96,15 +94,16 @@ export async function POST(req: Request) {
       })
     }
 
-    const aiResponse = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+    const aiResponse = await openai.chat.completions.create({
+      model: 'gpt-4o',
       max_tokens: 400,
-      system: ONBOARDING_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: systemPrompt }],
+      messages: [
+        { role: 'system', content: ONBOARDING_SYSTEM_PROMPT },
+        { role: 'user', content: systemPrompt },
+      ],
     })
 
-    const text =
-      aiResponse.content[0].type === 'text' ? aiResponse.content[0].text.trim() : null
+    const text = aiResponse.choices[0]?.message?.content?.trim() ?? null
 
     if (!text) throw new Error('No text content in onboarding response')
 

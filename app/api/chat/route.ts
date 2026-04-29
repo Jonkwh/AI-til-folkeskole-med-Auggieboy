@@ -1,8 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-})
+import OpenAI from 'openai'
 
 // Pedagogical behavior rules injected into every system prompt, between the role prompt and the guardrail.
 // These are invisible to teachers and students — they are server-side only.
@@ -86,7 +82,7 @@ TONE GUIDELINES
 - Never say "Wrong" or "That's incorrect." Instead: "Not quite — let's look at that part again."
 - Match the student's energy. If they are brief, be brief. If they are engaged and writing a lot, you can respond with slightly more.`
 
-// Maps student-facing role labels to proper Claude system prompt openings
+// Maps student-facing role labels to system prompt openings
 const ROLE_PROMPT_MAP: Record<string, string> = {
   'hjælpe med at forstå opgaven':
     'Du er en hjælpsom tutor. Din opgave er at hjælpe eleven med at forstå den opgave, de arbejder med. Stil spørgsmål der hjælper eleven med selv at finde ud af, hvad opgaven beder om.',
@@ -103,7 +99,6 @@ const ROLE_PROMPT_MAP: Record<string, string> = {
 }
 
 function mapSystemPrompt(studentPrompt: string): string {
-  // Match new format: "AI'en skal <role>. \nfor elever i ... \nAldrig ..."
   const roleMatch = studentPrompt.match(/AI'en skal (.+?)(?:\.\s|\.$|$)/m)
 
   if (roleMatch) {
@@ -111,8 +106,6 @@ function mapSystemPrompt(studentPrompt: string): string {
     const mappedOpening = ROLE_PROMPT_MAP[roleKey]
 
     if (mappedOpening) {
-      // Replace the student-facing role line with the mapped prompt opening
-      // Keep context and restriction lines as-is
       const rest = studentPrompt
         .replace(/AI'en skal .+?(?:\.\s|\.\s*$)/m, '')
         .trim()
@@ -120,7 +113,6 @@ function mapSystemPrompt(studentPrompt: string): string {
     }
   }
 
-  // Legacy format or unrecognized — pass through as-is
   return studentPrompt
 }
 
@@ -132,26 +124,27 @@ export async function POST(req: Request) {
       return new Response('Missing messages or systemPrompt', { status: 400 })
     }
 
-    // Map student-facing labels to proper Claude instructions
     const mappedPrompt = mapSystemPrompt(systemPrompt)
 
-    // Injected when the client detects the student is repeating themselves.
-    // Tells Claude to shift strategy without exposing the note to the student.
     const loopHint = isLooping
       ? '\n\n[INTERNAL NOTE: The student appears to be stuck or repeating themselves. Shift strategy: move one level up the scaffolding ladder and use a different question type from your previous turn. If you are already at Level 4, proceed to Level 5 — directly explain the concept blocking the student. Do not write their assignment, but remove the knowledge barrier.]'
       : ''
 
-    // Final prompt order: [role prompt] → [pedagogical rules] → [loop hint if triggered]
     const fullSystemPrompt = mappedPrompt + PEDAGOGICAL_RULES + loopHint
 
-    const stream = await anthropic.messages.stream({
-      model: 'claude-sonnet-4-20250514',
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+    const stream = await openai.chat.completions.create({
+      model: 'gpt-4o',
       max_tokens: 1024,
-      system: fullSystemPrompt,
-      messages: messages.map((m: { role: string; content: string }) => ({
-        role: m.role,
-        content: m.content,
-      })),
+      stream: true,
+      messages: [
+        { role: 'system', content: fullSystemPrompt },
+        ...messages.map((m: { role: string; content: string }) => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        })),
+      ],
     })
 
     const encoder = new TextEncoder()
@@ -159,12 +152,10 @@ export async function POST(req: Request) {
     const readable = new ReadableStream({
       async start(controller) {
         try {
-          for await (const event of stream) {
-            if (
-              event.type === 'content_block_delta' &&
-              event.delta.type === 'text_delta'
-            ) {
-              controller.enqueue(encoder.encode(event.delta.text))
+          for await (const chunk of stream) {
+            const text = chunk.choices[0]?.delta?.content
+            if (text) {
+              controller.enqueue(encoder.encode(text))
             }
           }
           controller.close()
@@ -183,8 +174,7 @@ export async function POST(req: Request) {
   } catch (error: unknown) {
     console.error('Chat API error:', error)
 
-    // Forward Anthropic rate limit errors as 429
-    if (error instanceof Anthropic.RateLimitError) {
+    if (error instanceof OpenAI.RateLimitError) {
       return new Response('Rate limited', { status: 429 })
     }
 

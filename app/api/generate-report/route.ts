@@ -1,10 +1,5 @@
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-})
-
-// Claude only generates the OVERSIGT paragraph — all structure is built in code.
 const SYSTEM_PROMPT = `Du er en assistent der hjælper lærere med at forstå, hvordan elever har brugt et AI-værktøj kaldet ThinkBot.
 
 Skriv 3-5 sætninger i klart dansk om hvad eleven arbejdede med og hvilken slags hjælp de bad om. Ingen overskrift, ingen markdown, ingen emojis, ingen punktopstillinger — kun løbende tekst.`
@@ -16,7 +11,6 @@ function sectionHeading(title: string): string {
 }
 
 function dotLeader(label: string, value: string, col = 40): string {
-  // e.g. "Dato ............................ 18. marts 2026"
   const dots = '.'.repeat(Math.max(1, col - label.length - 2))
   return `${label} ${dots} ${value}`
 }
@@ -52,22 +46,19 @@ export async function POST(req: Request) {
       .map((m) => `${m.role === 'user' ? '[Elev]' : '[ThinkBot]'}: ${m.content}`)
       .join('\n\n')
 
-    // Ask Claude for the OVERSIGT paragraph only
-    const aiResponse = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+    const aiResponse = await openai.chat.completions.create({
+      model: 'gpt-4o',
       max_tokens: 2048,
-      system: SYSTEM_PROMPT,
       messages: [
-        {
-          role: 'user',
-          content: `Masterprompt:\n${masterprompt}\n\nSamtale:\n${conversation}`,
-        },
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: `Masterprompt:\n${masterprompt}\n\nSamtale:\n${conversation}` },
       ],
     })
 
-    const oversigt = aiResponse.content[0].type === 'text' ? aiResponse.content[0].text.trim() : ''
+    const oversigt = aiResponse.choices[0]?.message?.content?.trim() ?? ''
 
-    // Build the full chat block: speaker label on one line, content on the next
     const chatLines = allMessages
       .map((m) => {
         const label = m.role === 'user' ? '[Elev]' : '[ThinkBot]'
@@ -75,7 +66,6 @@ export async function POST(req: Request) {
       })
       .join('\n\n')
 
-    // Assemble the report
     const report = [
       'THINKBOT SAMTALEEKSPORT',
       '-'.repeat('THINKBOT SAMTALEEKSPORT'.length),

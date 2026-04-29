@@ -3,7 +3,7 @@
 // NEVER expose this key to the client
 
 import { createClient } from '@supabase/supabase-js'
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 
 const SYSTEM_PROMPT = `Du er en pædagogisk analytiker. Du analyserer samtaler mellem elever og en AI-læringsassistent i en dansk folkeskole. Din opgave er at identificere mønstre på tværs af samtalerne og skrive en kort, konkret rapport til læreren.
 
@@ -79,16 +79,18 @@ export async function POST(req: Request) {
 
     const userMessage = `Her er ${usedSessions.length} elevsamtaler fra perioden ${from} til ${to}:\n\n${transcripts}${truncationNote}`
 
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
-    const aiResponse = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+    const aiResponse = await openai.chat.completions.create({
+      model: 'gpt-4o',
       max_tokens: 1500,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userMessage }],
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userMessage },
+      ],
     })
 
-    const rawText = aiResponse.content[0].type === 'text' ? aiResponse.content[0].text : ''
+    const rawText = aiResponse.choices[0]?.message?.content ?? ''
 
     // Parse the three sections
     const extractSection = (text: string, heading: string, nextHeading?: string): string => {
