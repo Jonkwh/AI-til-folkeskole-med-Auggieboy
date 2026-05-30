@@ -1,41 +1,56 @@
+// Marks this as a client component because it manages all interactive chat state and streaming.
 'use client'
 
+// Imports React primitives: useState for state, useRef for mutable values that don't trigger re-renders,
+// useEffect for side effects, Fragment to render multiple sibling elements without a wrapping div.
 import { useState, useRef, useEffect, Fragment } from 'react'
+// Imports the ReactMarkdown component to render Claude's responses with basic formatting.
 import ReactMarkdown from 'react-markdown'
+// Imports the browser-side Supabase client for saving messages to the database.
 import { createClient } from '@/lib/supabase'
+// Imports the "Del med lærer" button that opens the report-sharing modal.
 import ShareButton from './ShareButton'
+// Imports the collapsible masterprompt summary card shown above the message area.
 import MasterpromptCard from './MasterpromptCard'
 
+// The shape of a message in the conversation — used for both local state and Supabase rows.
 interface Message {
-  id?: string
+  id?: string // Supabase-generated UUID, only present for messages already saved to the database.
   role: 'user' | 'assistant'
   content: string
-  created_at?: string
-  isError?: boolean
-  isHidden?: boolean
+  created_at?: string // ISO timestamp — present for persisted messages, absent for optimistic local messages.
+  isError?: boolean // True for bot messages that represent an API failure rather than a real response.
+  isHidden?: boolean // True for onboarding summary messages shown as student bubbles but not rendered in the chat feed.
 }
 
+// A single step in the onboarding flow — a question with multiple choice options.
 interface OnboardingStep {
   question: string
   options: string[]
 }
 
+// Tracks a re-engagement card shown when the student appears to be looping.
+// afterIndex pins the card to a specific position in the message list so it stays inline even as more messages arrive.
 interface ReEngagementEntry {
-  afterIndex: number
-  selectedOption: string | null
+  afterIndex: number // The index of the student message that triggered the re-engagement card.
+  selectedOption: string | null // The option the student chose, or null while the card is still active.
 }
 
+// Props passed from the server-rendered chat page to this client component.
 interface ChatInterfaceProps {
-  sessionId: string
-  masterprompt: string
-  initialMessages: Message[]
-  sessionTitle: string
+  sessionId: string // The Supabase session ID — used to save new messages to the correct session.
+  masterprompt: string // The teacher's configured system prompt — sent to Claude on every API request.
+  initialMessages: Message[] // Messages already stored in the database, pre-loaded server-side to avoid a client fetch.
+  sessionTitle: string // The current title shown in the chat header.
 }
 
+// A message is considered "rate-limited" if the student sends more than 5 messages within a 10-second window.
 const RATE_LIMIT_WINDOW = 10_000 // 10 seconds
 const RATE_LIMIT_MAX = 5
+// Two student messages with a Jaccard word-overlap score above this threshold are treated as a looping pattern.
 const LOOP_SIMILARITY_THRESHOLD = 0.7
 
+// The four options shown on the re-engagement card when the student is detected as looping.
 const RE_ENGAGEMENT_OPTIONS = [
   'Giv mig et hint',
   'Prøv et nyt spørgsmål',
@@ -43,6 +58,8 @@ const RE_ENGAGEMENT_OPTIONS = [
   'Start forfra',
 ]
 
+// Maps each re-engagement card option to an internal note appended to the system prompt for that single API call.
+// The note overrides Claude's default scaffolding behaviour for the specific response triggered by the card.
 const RE_ENGAGEMENT_PROMPTS: Record<string, string> = {
   'Giv mig et hint':
     '\n\n[INTERNAL NOTE — OVERRIDE: The student has explicitly clicked a button requesting a hint. Do NOT ask whether they want a hint. Do NOT ask a clarifying question. Give a concrete, specific hint immediately in this response. A hint means narrowing the problem space with a specific piece of information or a concrete example — not a question. After the hint, you may ask one short follow-up question.]',
@@ -54,6 +71,7 @@ const RE_ENGAGEMENT_PROMPTS: Record<string, string> = {
     '\n\n[INTERNAL NOTE: The student wants to start over. Reset to Level 1 of the scaffolding ladder and begin with a forethought question.]',
 }
 
+// Generic fallback onboarding questions shown if the /api/onboarding request fails or takes too long.
 const ONBOARDING_FALLBACK: OnboardingStep[] = [
   {
     question: 'Hvad arbejder du med i dag?',
@@ -65,6 +83,8 @@ const ONBOARDING_FALLBACK: OnboardingStep[] = [
   },
 ]
 
+// Regular expressions that match common assignment-writing requests in Danish.
+// If a student's message matches any of these, it is blocked before reaching the API.
 const ASSIGNMENT_PATTERNS = [
   /skriv\s+(min|en|et|din)\s+(opgave|stil|afsnit|indledning|konklusion|besvarelse)/i,
   /skriv\s+opgaven/i,
@@ -75,7 +95,7 @@ const ASSIGNMENT_PATTERNS = [
   /afslut\s+min/i,
 ]
 
-// Patterns that indicate a low-information student response.
+// Patterns that indicate a low-information student response (e.g. "ved ikke", "hva", single word).
 const LOW_INFO_PATTERNS = /ved\s+(det\s+)?ikke|forstår\s+(det\s+)?ikke|ingen\s+ide|ikke\s+sikker|^nej$|^hvad$|^hva$/i
 
 // Returns true if a message carries little informational content.
@@ -86,43 +106,47 @@ function isLowInfo(msg: string): boolean {
 }
 
 // Jaccard similarity between two messages based on word overlap. Returns 0–1.
+// A value above LOOP_SIMILARITY_THRESHOLD indicates the student is repeating themselves.
 // Avoids Set spread to stay compatible with the project's TS/target config.
 function wordOverlapSimilarity(a: string, b: string): number {
+  // Tokenises a string into words longer than 2 characters, lowercased and stripped of punctuation.
   const words = (s: string) =>
     s.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter((w) => w.length > 2)
   const wordsA = words(a)
   const wordsB = words(b)
-  if (wordsA.length === 0 || wordsB.length === 0) return 0
+  if (wordsA.length === 0 || wordsB.length === 0) return 0 // Can't compare empty messages.
   const setB = new Set(wordsB)
-  const intersection = wordsA.filter((w) => setB.has(w)).length
+  const intersection = wordsA.filter((w) => setB.has(w)).length // Words present in both messages.
   const combined = wordsA.concat(wordsB)
-  const union = combined.filter((w, i) => combined.indexOf(w) === i).length
-  return intersection / union
+  const union = combined.filter((w, i) => combined.indexOf(w) === i).length // All unique words across both.
+  return intersection / union // Jaccard index: intersection ÷ union.
 }
 
+// The main chat component. Handles the full student interaction: onboarding, message submission,
+// streaming responses, loop detection, re-engagement cards, rate limiting, and database persistence.
 export default function ChatInterface({
   sessionId,
   masterprompt,
   initialMessages,
   sessionTitle,
 }: ChatInterfaceProps) {
-  const supabase = createClient()
-  const [messages, setMessages] = useState<Message[]>(initialMessages)
-  const [input, setInput] = useState('')
-  const [isStreaming, setIsStreaming] = useState(false)
-  const [title, setTitle] = useState(sessionTitle)
-  const [rateLimited, setRateLimited] = useState(false)
-  const [assignmentBlocked, setAssignmentBlocked] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const messageTimestamps = useRef<number[]>([])
+  const supabase = createClient() // Browser-side Supabase client used to persist messages.
+  const [messages, setMessages] = useState<Message[]>(initialMessages) // The conversation history shown in the chat feed.
+  const [input, setInput] = useState('') // The current value in the text input area.
+  const [isStreaming, setIsStreaming] = useState(false) // True while a streaming response from Claude is in progress.
+  const [title, setTitle] = useState(sessionTitle) // The session title shown in the chat header — updated after the first message.
+  const [rateLimited, setRateLimited] = useState(false) // True when the student has sent too many messages too quickly.
+  const [assignmentBlocked, setAssignmentBlocked] = useState(false) // True when the student's message matched an assignment-writing pattern.
+  const messagesEndRef = useRef<HTMLDivElement>(null) // Invisible div at the bottom of the message list — scrolled into view on new messages.
+  const textareaRef = useRef<HTMLTextAreaElement>(null) // Reference to the text input — used to focus it when "Skriv noget selv" is clicked.
+  const messageTimestamps = useRef<number[]>([]) // Rolling list of timestamps for messages sent in the current window — used for rate limiting.
   // Tracks whether the student appears to be looping. Set after each bot response,
   // read on the next send, and cleared automatically when topics diverge.
   const isLooping = useRef(false)
   // Blocks isLooping from being set to true for N more student messages after a
   // re-engagement card is selected, preventing back-to-back card appearances.
   const reEngagementCooldownRef = useRef(0)
-  const isNewChat = initialMessages.length === 0
+  const isNewChat = initialMessages.length === 0 // True when this session has no prior messages — enables the onboarding flow.
 
   // ── Onboarding ─────────────────────────────────────────────────────────────
   // onboardingFetchedRef is set synchronously before the first async tick to
@@ -188,17 +212,19 @@ export default function ChatInterface({
     }
   }, [input])
 
+  // Checks whether the student has exceeded the rate limit. Returns true if the message is allowed.
+  // Enforced client-side to give instant feedback without a round trip to the server.
   function checkRateLimit(): boolean {
     const now = Date.now()
-    // Remove timestamps outside the window
+    // Remove timestamps outside the window — keeps only messages sent in the last 10 seconds.
     messageTimestamps.current = messageTimestamps.current.filter(
       (t) => now - t < RATE_LIMIT_WINDOW
     )
     if (messageTimestamps.current.length >= RATE_LIMIT_MAX) {
-      setRateLimited(true)
-      // Auto-clear when the oldest message in the window expires
+      setRateLimited(true) // Shows the "Vent et øjeblik" message below the input.
+      // Auto-clear when the oldest message in the window expires — no manual reset needed.
       const oldest = messageTimestamps.current[0]
-      const delay = RATE_LIMIT_WINDOW - (now - oldest) + 100
+      const delay = RATE_LIMIT_WINDOW - (now - oldest) + 100 // +100ms buffer to avoid a race condition.
       setTimeout(() => {
         messageTimestamps.current = messageTimestamps.current.filter(
           (t) => Date.now() - t < RATE_LIMIT_WINDOW
@@ -207,23 +233,27 @@ export default function ChatInterface({
       }, delay)
       return false
     }
-    messageTimestamps.current.push(now)
+    messageTimestamps.current.push(now) // Records this message's timestamp for future rate-limit checks.
     return true
   }
 
+  // Updates the session title in both React state and the database using the first 40 characters of the message.
+  // The '…' suffix is added when the message is longer than 40 characters to indicate truncation.
   async function updateSessionTitle(firstMessage: string) {
-    const sanitized = firstMessage.replace(/—/g, '-')
+    const sanitized = firstMessage.replace(/—/g, '-') // Normalises em dashes for consistency.
     const newTitle = sanitized.slice(0, 40) + (sanitized.length > 40 ? '...' : '')
-    setTitle(newTitle)
+    setTitle(newTitle) // Updates the header immediately without waiting for the database write.
     await supabase
       .from('chat_sessions')
       .update({ title: newTitle })
       .eq('id', sessionId)
   }
 
+  // Persists a single message to the Supabase messages table.
+  // Called after every student message and after every completed bot response.
   async function saveMessage(role: 'user' | 'assistant', content: string) {
     await supabase.from('messages').insert({
-      session_id: sessionId,
+      session_id: sessionId, // Links the message to the correct session.
       role,
       content,
     })
@@ -521,23 +551,27 @@ export default function ChatInterface({
     await callChatAPI(allMessages, undefined, userMessage)
   }
 
+  // Submits the form when the student presses Enter without Shift (Shift+Enter inserts a newline instead).
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
+      e.preventDefault() // Prevents the default newline insertion in the textarea.
       handleSubmit(e)
     }
   }
 
+  // The send button is disabled while streaming, rate-limited, or when a re-engagement card is waiting for a selection.
   const sendDisabled =
     !input.trim() || isStreaming || rateLimited || !!activeReEngagement
+  // The text input is disabled during streaming and while a re-engagement card is active.
   const inputDisabled = !!activeReEngagement || isStreaming
+  // The placeholder text adapts to the current interaction state to guide the student.
   const inputPlaceholder = !onboardingComplete
     ? step1Answer
-      ? 'Eller skriv dit eget svar...'
-      : 'Eller beskriv hvad du arbejder med...'
+      ? 'Eller skriv dit eget svar...' // Step 2 of onboarding — the student can type instead of picking a card.
+      : 'Eller beskriv hvad du arbejder med...' // Step 1 of onboarding — invites free text.
     : activeReEngagement
-    ? 'Vælg en mulighed ovenfor...'
-    : 'Skriv din besked...'
+    ? 'Vælg en mulighed ovenfor...' // Re-engagement card is showing — input is disabled.
+    : 'Skriv din besked...' // Normal chat mode.
 
   // ── Shared card class builder ───────────────────────────────────────────────
   // Returns the Tailwind class string for an option card given its selection state.

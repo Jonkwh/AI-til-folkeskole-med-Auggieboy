@@ -1,34 +1,45 @@
+// Marks this as a client component because it manages interactive state and listens to navigation events.
 'use client'
 
+// Imports React hooks: useEffect for side effects, useState for state, useRef for the rename input focus.
 import { useEffect, useState, useRef } from 'react'
+// Imports navigation hooks: useRouter to redirect, useParams to read the current session ID from the URL.
 import { useRouter, useParams } from 'next/navigation'
+// Imports the browser-side Supabase client for fetching and modifying chat sessions.
 import { createClient } from '@/lib/supabase'
+// Imports the modal component that wraps the MasterpromptBuilder for creating new chats.
 import MasterpromptModal from './MasterpromptModal'
+// Imports the dark mode hook that reads and persists the user's theme preference.
 import { useDarkMode } from '@/hooks/useDarkMode'
 
+// Minimal shape of a chat session as returned by the Supabase query in loadSessions.
 interface ChatSession {
   id: string
   title: string
   created_at: string
 }
 
+// The left-side navigation panel that lists the user's previous chat sessions and provides controls for
+// creating new sessions, renaming, deleting, switching theme, and logging out.
 export default function Sidebar() {
-  const router = useRouter()
-  const params = useParams()
-  const supabase = createClient()
-  const [sessions, setSessions] = useState<ChatSession[]>([])
-  const [loading, setLoading] = useState(true)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editTitle, setEditTitle] = useState('')
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const editInputRef = useRef<HTMLInputElement>(null)
-  const { isDark, toggleDark } = useDarkMode()
+  const router = useRouter() // Used to navigate programmatically (e.g. after delete, logout).
+  const params = useParams() // Reads the current [sessionId] URL segment to highlight the active session.
+  const supabase = createClient() // Browser-side Supabase client for all database and auth operations.
+  const [sessions, setSessions] = useState<ChatSession[]>([]) // The list of chat sessions shown in the sidebar.
+  const [loading, setLoading] = useState(true) // True while sessions are being fetched — shows skeleton placeholders.
+  const [editingId, setEditingId] = useState<string | null>(null) // The ID of the session currently being renamed, or null.
+  const [editTitle, setEditTitle] = useState('') // The current value in the rename input field.
+  const [deletingId, setDeletingId] = useState<string | null>(null) // The ID of the session awaiting delete confirmation, or null.
+  const [isModalOpen, setIsModalOpen] = useState(false) // Controls whether the "new chat" masterprompt modal is open.
+  const editInputRef = useRef<HTMLInputElement>(null) // Reference to the rename input — used to focus it when editing starts.
+  const { isDark, toggleDark } = useDarkMode() // Current theme state and toggle function from the dark mode hook.
 
+  // Loads the session list when the sidebar first mounts.
   useEffect(() => {
     loadSessions()
   }, [])
 
+  // Focuses and selects all text in the rename input whenever the user starts renaming a session.
   useEffect(() => {
     if (editingId && editInputRef.current) {
       editInputRef.current.focus()
@@ -36,83 +47,97 @@ export default function Sidebar() {
     }
   }, [editingId])
 
+  // Fetches all chat sessions belonging to the currently logged-in user, sorted newest first.
   async function loadSessions() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) return // Silently exits if the user is not logged in — the page-level guard handles the redirect.
 
     const { data } = await supabase
       .from('chat_sessions')
       .select('id, title, created_at')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
+      .eq('user_id', user.id) // Ensures each user only sees their own sessions.
+      .order('created_at', { ascending: false }) // Newest sessions appear at the top of the list.
 
-    setSessions(data || [])
+    setSessions(data || []) // Falls back to an empty array if the query returns no data.
     setLoading(false)
   }
 
+  // Formats an ISO timestamp as a human-readable relative date string (e.g. "I dag", "I går", "3 dage siden").
   function formatDate(dateStr: string) {
     const date = new Date(dateStr)
     const now = new Date()
+    // Calculates how many full days have passed since the session was created.
     const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
 
     if (diffDays === 0) return 'I dag'
     if (diffDays === 1) return 'I går'
     if (diffDays < 7) return `${diffDays} dage siden`
+    // For sessions older than a week, shows a short date like "18. mar".
     return date.toLocaleDateString('da-DK', { month: 'short', day: 'numeric' })
   }
 
+  // Signs the user out and redirects them to the login page.
   async function handleLogout() {
     await supabase.auth.signOut()
     router.push('/login')
   }
 
+  // Enters rename mode for a session: stores its ID and current title so the edit input is pre-filled.
+  // Also closes any pending delete confirmation to avoid two active states at once.
   function startRename(session: ChatSession) {
     setEditingId(session.id)
     setEditTitle(session.title)
     setDeletingId(null)
   }
 
+  // Saves the new title to Supabase and updates the local session list optimistically.
   async function saveRename(sessionId: string) {
-    const trimmed = editTitle.trim().replace(/—/g, '-')
+    const trimmed = editTitle.trim().replace(/—/g, '-') // Normalises em dashes to hyphens for consistency.
     if (!trimmed) {
-      // Revert if empty
+      // Revert if empty — an empty title would be confusing in the session list.
       setEditingId(null)
       return
     }
 
+    // Persists the new title to the database.
     await supabase
       .from('chat_sessions')
       .update({ title: trimmed })
       .eq('id', sessionId)
 
+    // Updates the local state immediately so the UI reflects the change without a full reload.
     setSessions((prev) =>
       prev.map((s) => (s.id === sessionId ? { ...s, title: trimmed } : s))
     )
-    setEditingId(null)
+    setEditingId(null) // Exits rename mode.
   }
 
+  // Cancels renaming without saving — discards any edits.
   function cancelRename() {
     setEditingId(null)
   }
 
+  // Handles keyboard shortcuts in the rename input: Enter saves, Escape cancels.
   function handleRenameKeyDown(e: React.KeyboardEvent, sessionId: string) {
     if (e.key === 'Enter') {
-      e.preventDefault()
+      e.preventDefault() // Prevents form submission if the input is inside a form.
       saveRename(sessionId)
     } else if (e.key === 'Escape') {
       cancelRename()
     }
   }
 
+  // Permanently deletes a session and all its messages from the database.
+  // Messages must be deleted first because of the foreign-key constraint on session_id.
   async function confirmDelete(sessionId: string) {
-    await supabase.from('messages').delete().eq('session_id', sessionId)
-    await supabase.from('chat_sessions').delete().eq('id', sessionId)
+    await supabase.from('messages').delete().eq('session_id', sessionId) // Removes all messages for this session.
+    await supabase.from('chat_sessions').delete().eq('id', sessionId) // Removes the session itself.
 
-    setSessions((prev) => prev.filter((s) => s.id !== sessionId))
-    setDeletingId(null)
+    setSessions((prev) => prev.filter((s) => s.id !== sessionId)) // Removes the deleted session from the local list.
+    setDeletingId(null) // Exits the delete confirmation state.
 
-    // If the deleted session is the currently open one, redirect to builder
+    // If the deleted session is the currently open one, redirect to builder to avoid showing a broken chat.
     if (params?.sessionId === sessionId) {
       router.push('/builder')
     }

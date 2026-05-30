@@ -1,23 +1,30 @@
+// Marks this as a client component so it can manage form state and respond to user interactions.
 'use client'
 
+// Imports useState to track the currently selected dropdown values and checked restriction options.
 import { useState } from 'react'
+// Imports useRouter to navigate to the newly created chat session after the teacher clicks "Start chat".
 import { useRouter } from 'next/navigation'
+// Imports the browser-side Supabase client to create a new chat session in the database.
 import { createClient } from '@/lib/supabase'
 
+// Describes the configuration shape for each of the three building blocks (Role, Context, Restriction).
 interface BlockConfig {
-  label: string
-  prefix: string
-  suffix?: string
-  color: { bg: string; border: string; text: string }
-  dropdowns: {
+  label: string // The block's display label, shown in uppercase above the block (e.g. "AI'EN SKAL").
+  prefix: string // Static text displayed before the dropdown(s) within the block.
+  suffix?: string // Optional static text displayed after the dropdown(s) (e.g. " i en dansk skole").
+  color: { bg: string; border: string; text: string } // The colour scheme for this block's card.
+  dropdowns: { // The dropdown(s) inside this block — may be empty (Restriction block uses checkboxes instead).
     key: string
     options: string[]
   }[]
 }
 
+// Defines the three building blocks rendered in the masterprompt builder.
+// Each block contributes one line to the assembled masterprompt text.
 const BLOCKS: BlockConfig[] = [
   {
-    label: "AI'EN SKAL",
+    label: "AI'EN SKAL", // Block 1: the bot's role (what it helps the student with).
     prefix: "AI'en skal ",
     color: { bg: '#CECBF6', border: '#AFA9EC', text: '#5B52C9' },
     dropdowns: [
@@ -35,7 +42,7 @@ const BLOCKS: BlockConfig[] = [
     ],
   },
   {
-    label: 'KONTEKST',
+    label: 'KONTEKST', // Block 2: the student's grade and subject.
     prefix: 'for elever i ',
     suffix: ' i en dansk skole',
     color: { bg: '#9FE1CB', border: '#5DCAA5', text: '#1D7A55' },
@@ -51,13 +58,16 @@ const BLOCKS: BlockConfig[] = [
     ],
   },
   {
-    label: 'BEGRÆNSNING',
+    label: 'BEGRÆNSNING', // Block 3: what the bot must never do — uses checkboxes instead of dropdowns.
     prefix: '',
     color: { bg: '#F5C4B3', border: '#F0997B', text: '#B8432A' },
-    dropdowns: [],
+    dropdowns: [], // No dropdowns — this block is handled by the RESTRICTION_OPTIONS checkboxes below.
   },
 ]
 
+// The available restriction rules teachers can apply. Each entry has:
+// - label: the human-readable description shown in the UI checkbox.
+// - prompt: the machine-readable phrase inserted into the "Aldrig ..." line of the masterprompt.
 const RESTRICTION_OPTIONS = [
   { label: 'Brug kun eksempler fra den tekst eller det emne, eleven arbejder med', prompt: 'bruge eksempler fra andre tekster eller emner end dem eleven arbejder med' },
   { label: 'Svar kun på dansk. Skift ikke til et andet sprog, selvom eleven gør det', prompt: 'skifte til et andet sprog end dansk, selvom eleven gør det' },
@@ -66,75 +76,93 @@ const RESTRICTION_OPTIONS = [
   { label: 'Hold dig til det emne eller den tekst, eleven nævner i starten, og gå ikke videre til andre emner', prompt: 'gå videre til andre emner end det emne eller den tekst, eleven nævner i starten' },
 ]
 
+// The masterprompt builder form. Teachers configure the bot's role, context, and restrictions,
+// then click "Start chat" to create a new session and navigate to it.
 export default function MasterpromptBuilder() {
   const router = useRouter()
   const supabase = createClient()
+  // Tracks the currently selected value for each dropdown (role, grade, subject).
+  // Initialised to the first option in each list so the preview is always populated.
   const [selections, setSelections] = useState<Record<string, string>>({
     role: BLOCKS[0].dropdowns[0].options[0],
     grade: BLOCKS[1].dropdowns[0].options[0],
     subject: BLOCKS[1].dropdowns[1].options[0],
   })
+  // Tracks which restriction checkboxes are checked. The first restriction is checked by default.
   const [checkedRestrictions, setCheckedRestrictions] = useState([true, false, false, false, false])
+  // True while the session creation request is in flight — disables the "Start chat" button.
   const [loading, setLoading] = useState(false)
 
+  // Updates the stored selection when the user changes a dropdown value.
   function handleChange(key: string, value: string) {
     setSelections((prev) => ({ ...prev, [key]: value }))
   }
 
+  // Toggles a restriction checkbox. At least one restriction must always remain checked —
+  // the function returns early without changes if the user tries to uncheck the last active restriction.
   function handleRestrictionToggle(index: number) {
     setCheckedRestrictions((prev) => {
       const checkedCount = prev.filter(Boolean).length
-      if (prev[index] && checkedCount <= 1) return prev
+      if (prev[index] && checkedCount <= 1) return prev // Prevents all restrictions from being unchecked.
       const next = [...prev]
-      next[index] = !next[index]
+      next[index] = !next[index] // Flips the checkbox at the given index.
       return next
     })
   }
 
+  // Builds the restriction text for the "Aldrig ..." line by joining all checked restriction prompts.
+  // Multiple restrictions are joined with commas and "og" (e.g. "A, B og C").
   function buildRestrictionText(): string {
     const selected = RESTRICTION_OPTIONS
-      .filter((_, i) => checkedRestrictions[i])
-      .map((opt) => opt.prompt)
+      .filter((_, i) => checkedRestrictions[i]) // Keeps only checked restrictions.
+      .map((opt) => opt.prompt) // Uses the machine-readable prompt phrase, not the UI label.
     if (selected.length === 1) return selected[0]
     return selected.slice(0, -1).join(', ') + ' og ' + selected[selected.length - 1]
   }
 
+  // Assembles the complete masterprompt string from the current selections and restrictions.
+  // The output is the exact text stored in the database and sent to Claude as the system prompt.
   function assemblePrompt(): string {
     const lines = [
       `AI'en skal ${selections.role}`,
       `for elever i ${selections.grade} i ${selections.subject} i en dansk skole`,
       `Aldrig ${buildRestrictionText()}.`,
     ]
-    return lines.join('. \n')
+    return lines.join('. \n') // Each line is separated by ". \n" to form a readable multi-line instruction.
   }
 
+  // Provides a rough token estimate for the assembled prompt.
+  // Words × 1.3 is a common approximation for English/Danish text (some words split into multiple tokens).
   function estimateTokens(text: string): number {
     const words = text.split(/\s+/).length
     return Math.round(words * 1.3)
   }
 
+  // Creates a new chat session in Supabase with the assembled masterprompt, then navigates to it.
   async function handleStartChat() {
     setLoading(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
+        // Redirects to login if the session has expired — shouldn't normally happen on this page.
         router.push('/login')
         return
       }
 
-      const masterprompt = assemblePrompt()
+      const masterprompt = assemblePrompt() // Captures the current prompt before navigating away.
+      // Inserts a new row into chat_sessions and returns the created row so we can read its generated ID.
       const { data: session, error } = await supabase
         .from('chat_sessions')
         .insert({
           user_id: user.id,
-          title: 'Ny chat',
+          title: 'Ny chat', // Placeholder title — updated automatically after the first student message.
           masterprompt,
         })
         .select()
         .single()
 
       if (error) throw error
-      router.push(`/chat/${session.id}`)
+      router.push(`/chat/${session.id}`) // Navigates to the newly created session.
     } catch (err) {
       console.error('Failed to create chat session:', err)
     } finally {
@@ -142,7 +170,7 @@ export default function MasterpromptBuilder() {
     }
   }
 
-  const prompt = assemblePrompt()
+  const prompt = assemblePrompt() // Used for the live preview and the token estimate shown in the UI.
   const tokenCount = estimateTokens(prompt)
 
   return (

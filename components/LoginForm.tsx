@@ -1,24 +1,32 @@
+// Marks this as a client component because it handles form input and user interaction.
 'use client'
 
+// Imports useState to manage form field values and UI state.
 import { useState } from 'react'
+// Imports useRouter to programmatically navigate after a successful login or sign-up.
 import { useRouter } from 'next/navigation'
+// Imports the Supabase browser client factory for authentication operations.
 import { createClient } from '@/lib/supabase'
 
+// The login and sign-up form — teachers use this to access ThinkBot.
+// Toggling between login and sign-up modes is handled by the isSignUp state variable.
 export default function LoginForm() {
-  const router = useRouter()
-  const supabase = createClient()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [isSignUp, setIsSignUp] = useState(false)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const router = useRouter() // Used to redirect to /builder after successful authentication.
+  const supabase = createClient() // Browser-side Supabase client for auth calls.
+  const [email, setEmail] = useState('') // Tracks the value typed in the email input.
+  const [password, setPassword] = useState('') // Tracks the value typed in the password input.
+  const [confirmPassword, setConfirmPassword] = useState('') // Tracks the confirmation password, only used during sign-up.
+  const [isSignUp, setIsSignUp] = useState(false) // Toggles between login mode (false) and sign-up mode (true).
+  const [error, setError] = useState('') // Holds any error message to display below the form.
+  const [loading, setLoading] = useState(false) // True while the auth request is in flight — disables the submit button.
 
+  // Handles form submission for both login and sign-up.
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+    e.preventDefault() // Prevents the browser's default full-page form submission.
     setError('')
     setLoading(true)
 
+    // Client-side validation: passwords must match before hitting the Supabase API.
     if (isSignUp && password !== confirmPassword) {
       setError('Adgangskoderne stemmer ikke overens')
       setLoading(false)
@@ -27,19 +35,22 @@ export default function LoginForm() {
 
     try {
       if (isSignUp) {
+        // Registers a new user with Supabase Auth using the provided email and password.
         const { error } = await supabase.auth.signUp({ email, password })
         if (error) throw error
-        router.push('/builder')
+        router.push('/builder') // Redirects to the builder page after a successful sign-up.
       } else {
+        // Logs in an existing user and establishes an authenticated session via cookie.
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
-        router.push('/builder')
+        router.push('/builder') // Redirects to the builder page after a successful login.
       }
     } catch (err: unknown) {
+      // Extracts the error message from the Supabase error object and shows it in the form.
       const message = err instanceof Error ? err.message : 'Der opstod en fejl'
       setError(message)
     } finally {
-      setLoading(false)
+      setLoading(false) // Re-enables the submit button regardless of whether the request succeeded or failed.
     }
   }
 
