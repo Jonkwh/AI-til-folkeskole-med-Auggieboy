@@ -1,7 +1,9 @@
+// Imports the Anthropic SDK to call Claude for streaming chat responses.
 import Anthropic from '@anthropic-ai/sdk'
 
+// Creates the Anthropic client at module level so it is reused across requests rather than re-created each time.
 const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+  apiKey: process.env.ANTHROPIC_API_KEY, // Secret key — must never be exposed to the browser.
 })
 
 // Pedagogical behavior rules injected into every system prompt, between the role prompt and the guardrail.
@@ -86,7 +88,8 @@ TONE GUIDELINES
 - Never say "Wrong" or "That's incorrect." Instead: "Not quite — let's look at that part again."
 - Match the student's energy. If they are brief, be brief. If they are engaged and writing a lot, you can respond with slightly more.`
 
-// Maps student-facing role labels to proper Claude system prompt openings
+// Maps student-facing role labels (as they appear in the masterprompt) to proper Claude system prompt openings.
+// This replaces the short teacher-written label with a full instructional persona sentence for Claude.
 const ROLE_PROMPT_MAP: Record<string, string> = {
   'hjælpe med at forstå opgaven':
     'Du er en hjælpsom tutor. Din opgave er at hjælpe eleven med at forstå den opgave, de arbejder med. Stil spørgsmål der hjælper eleven med selv at finde ud af, hvad opgaven beder om.',
@@ -102,37 +105,44 @@ const ROLE_PROMPT_MAP: Record<string, string> = {
     'Du er en dataformidler. Din opgave er at hjælpe eleven med at forstå, beskrive og visualisere data ved hjælp af tabeller, forklaringer og forslag til diagrammer.',
 }
 
+// Replaces the teacher-written "AI'en skal <role>" line with the full Claude-ready persona sentence from ROLE_PROMPT_MAP.
+// All other lines (grade/subject context, restriction) are kept unchanged so the full prompt structure is preserved.
 function mapSystemPrompt(studentPrompt: string): string {
   // Match new format: "AI'en skal <role>. \nfor elever i ... \nAldrig ..."
   const roleMatch = studentPrompt.match(/AI'en skal (.+?)(?:\.\s|\.$|$)/m)
 
   if (roleMatch) {
-    const roleKey = roleMatch[1].trim()
-    const mappedOpening = ROLE_PROMPT_MAP[roleKey]
+    const roleKey = roleMatch[1].trim() // The role label exactly as written by the teacher (e.g. "hjælpe med at forstå opgaven").
+    const mappedOpening = ROLE_PROMPT_MAP[roleKey] // Looks up the full instructional persona for that label.
 
     if (mappedOpening) {
-      // Replace the student-facing role line with the mapped prompt opening
-      // Keep context and restriction lines as-is
+      // Replace the student-facing role line with the mapped prompt opening.
+      // Keep context and restriction lines as-is — only the role sentence changes.
       const rest = studentPrompt
-        .replace(/AI'en skal .+?(?:\.\s|\.\s*$)/m, '')
+        .replace(/AI'en skal .+?(?:\.\s|\.\s*$)/m, '') // Removes only the matched "AI'en skal ..." sentence.
         .trim()
       return `${mappedOpening}\n${rest}`
     }
   }
 
-  // Legacy format or unrecognized — pass through as-is
+  // Legacy format or unrecognized role label — pass the prompt through unchanged.
   return studentPrompt
 }
 
+// API route handler for POST /api/chat.
+// Receives the conversation history, assembles the full system prompt, and streams Claude's response back to the client.
 export async function POST(req: Request) {
   try {
+    // Parses the request body: messages is the conversation history, systemPrompt is the teacher's masterprompt,
+    // isLooping is a boolean flag set by the client when the student appears to be repeating themselves.
     const { messages, systemPrompt, isLooping } = await req.json()
 
     if (!messages || !systemPrompt) {
+      // Returns a 400 Bad Request if the required fields are missing.
       return new Response('Missing messages or systemPrompt', { status: 400 })
     }
 
-    // Map student-facing labels to proper Claude instructions
+    // Replaces the short teacher-written role label with the full Claude persona sentence.
     const mappedPrompt = mapSystemPrompt(systemPrompt)
 
     // Injected when the client detects the student is repeating themselves.
@@ -148,20 +158,25 @@ export async function POST(req: Request) {
       : ''
 
     // Final prompt order: [role prompt] → [pedagogical rules] → [loop hint if triggered] → [role overrides]
+    // This layered structure keeps teacher instructions, pedagogical scaffolding, and runtime overrides clearly separated.
     const fullSystemPrompt = mappedPrompt + PEDAGOGICAL_RULES + loopHint + dataVizOverride
 
+    // Opens a streaming connection to Claude — text arrives in chunks rather than waiting for the full response.
     const stream = await anthropic.messages.stream({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
+      max_tokens: 1024, // Keeps responses focused — a scaffolding-based tutor rarely needs longer answers.
       system: fullSystemPrompt,
+      // Maps each message from the client shape to the Anthropic API shape (role + content only).
       messages: messages.map((m: { role: string; content: string }) => ({
         role: m.role,
         content: m.content,
       })),
     })
 
+    // TextEncoder converts JavaScript strings into Uint8Array bytes for the browser's streaming reader.
     const encoder = new TextEncoder()
 
+    // Creates a ReadableStream that pumps Claude's text chunks to the client as they arrive.
     const readable = new ReadableStream({
       async start(controller) {
         try {
@@ -170,16 +185,18 @@ export async function POST(req: Request) {
               event.type === 'content_block_delta' &&
               event.delta.type === 'text_delta'
             ) {
+              // Encodes and enqueues each text chunk so the client can render it incrementally.
               controller.enqueue(encoder.encode(event.delta.text))
             }
           }
-          controller.close()
+          controller.close() // Signals to the client that the stream has ended normally.
         } catch (err) {
-          controller.error(err)
+          controller.error(err) // Signals an error to the client if streaming fails mid-response.
         }
       },
     })
 
+    // Returns the streaming response. 'no-cache' prevents browsers from caching partial stream data.
     return new Response(readable, {
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
@@ -189,7 +206,7 @@ export async function POST(req: Request) {
   } catch (error: unknown) {
     console.error('Chat API error:', error)
 
-    // Forward Anthropic rate limit errors as 429
+    // Forward Anthropic rate limit errors as 429 so the client can show a user-friendly message.
     if (error instanceof Anthropic.RateLimitError) {
       return new Response('Rate limited', { status: 429 })
     }
