@@ -1,15 +1,49 @@
+/*
+ * MasterpromptModal.tsx
+ *
+ * This file exports the MasterpromptModal component — a full-screen overlay modal that
+ * wraps the MasterpromptBuilder form. It is used in the teacher-facing sidebar when the
+ * teacher wants to create or reconfigure a new chat session without leaving the current page.
+ *
+ * Exports:
+ *   - default: MasterpromptModal (React functional component)
+ *
+ * How it fits in the app:
+ *   The sidebar renders a "Ny chat" button that, when clicked, sets isOpen to true and
+ *   mounts this modal. The modal renders MasterpromptBuilder inside a centred panel with
+ *   a semi-transparent backdrop. Clicking the backdrop or the X button calls onClose,
+ *   which lets the parent unmount the modal by toggling isOpen back to false.
+ */
+
 // Marks this as a client component so it can respond to user interactions like button clicks.
 'use client'
 
 // Imports the full masterprompt builder form that is displayed inside the modal.
 import MasterpromptBuilder from './MasterpromptBuilder'
 
+/*
+ * MasterpromptModalProps is a TypeScript interface that defines the shape of the props
+ * object accepted by the MasterpromptModal component. It requires exactly two fields:
+ *   - isOpen: a boolean that controls whether the modal is visible
+ *   - onClose: a void callback that the parent calls to dismiss the modal
+ */
 // TypeScript interface that describes the two props this component requires.
 interface MasterpromptModalProps {
   isOpen: boolean // Controls whether the modal is currently visible.
   onClose: () => void // Callback function that the parent calls to close the modal.
 }
 
+/*
+ * MasterpromptModal is a function that takes 1 parameter
+ *   ({ isOpen, onClose }: MasterpromptModalProps)
+ * and returns JSX (a React element) or null.
+ *
+ * When isOpen is false the function returns null immediately, which removes the
+ * entire modal from the DOM. When isOpen is true it renders a fixed full-screen
+ * overlay with a clickable backdrop and a scrollable white panel containing
+ * MasterpromptBuilder. A close button in the top-right corner and a click on the
+ * backdrop both invoke the onClose callback.
+ */
 // A full-screen overlay modal that wraps the MasterpromptBuilder form.
 // Used when the teacher wants to create a new chat session from the sidebar.
 export default function MasterpromptModal({ isOpen, onClose }: MasterpromptModalProps) {

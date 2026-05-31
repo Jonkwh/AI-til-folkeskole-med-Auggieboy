@@ -1,3 +1,27 @@
+/*
+ * Sidebar.tsx
+ *
+ * This file defines and exports the Sidebar React component — the persistent left-side
+ * navigation panel shown on the ThinkBot chat and builder pages.
+ *
+ * What it does:
+ *   - Fetches and displays the current teacher's chat sessions (sorted newest first) as a
+ *     scrollable list. Each entry shows the session title and a human-readable relative date.
+ *   - Highlights the currently open session (matched against the URL's [sessionId] param).
+ *   - Provides per-session actions on hover: rename (inline edit input) and delete (with a
+ *     two-step confirmation UI). On delete, also navigates away if the deleted session is open.
+ *   - Renders a "+ Ny chat" button that opens the MasterpromptModal to create a new session.
+ *   - Provides footer controls: a dark/light mode toggle and a "Log ud" (logout) button.
+ *
+ * Exports:
+ *   - Sidebar (default export): a React component with no required props.
+ *
+ * How it fits in the app:
+ *   - Mounted in the shared layout wrapper used by /chat/[sessionId] and /builder pages.
+ *   - Depends on MasterpromptModal (opens it for new session creation) and useDarkMode hook.
+ *   - Reads and writes the `chat_sessions` and `messages` Supabase tables.
+ */
+
 // Marks this as a client component because it manages interactive state and listens to navigation events.
 'use client'
 
@@ -12,6 +36,16 @@ import MasterpromptModal from './MasterpromptModal'
 // Imports the dark mode hook that reads and persists the user's theme preference.
 import { useDarkMode } from '@/hooks/useDarkMode'
 
+/*
+ * ChatSession is a TypeScript interface that defines the shape of a single chat session
+ * object as returned by the Supabase query in loadSessions. It contains only the three
+ * fields the Sidebar needs; the full table has additional columns (e.g. masterprompt).
+ *
+ * Fields:
+ *   id         — the UUID primary key of the session row.
+ *   title      — the display title shown in the sidebar list item.
+ *   created_at — the ISO 8601 timestamp string used for relative date formatting.
+ */
 // Minimal shape of a chat session as returned by the Supabase query in loadSessions.
 interface ChatSession {
   id: string
@@ -19,20 +53,41 @@ interface ChatSession {
   created_at: string
 }
 
+/*
+ * Sidebar is a function (React component) that takes no parameters and returns JSX.
+ *
+ * It renders the entire left-side navigation panel, including:
+ *   - The ThinkBot logo and "+ Ny chat" button at the top.
+ *   - The scrollable session list in the middle.
+ *   - The theme toggle and logout button in the footer.
+ */
 // The left-side navigation panel that lists the user's previous chat sessions and provides controls for
 // creating new sessions, renaming, deleting, switching theme, and logging out.
 export default function Sidebar() {
-  const router = useRouter() // Used to navigate programmatically (e.g. after delete, logout).
-  const params = useParams() // Reads the current [sessionId] URL segment to highlight the active session.
-  const supabase = createClient() // Browser-side Supabase client for all database and auth operations.
-  const [sessions, setSessions] = useState<ChatSession[]>([]) // The list of chat sessions shown in the sidebar.
-  const [loading, setLoading] = useState(true) // True while sessions are being fetched — shows skeleton placeholders.
-  const [editingId, setEditingId] = useState<string | null>(null) // The ID of the session currently being renamed, or null.
-  const [editTitle, setEditTitle] = useState('') // The current value in the rename input field.
-  const [deletingId, setDeletingId] = useState<string | null>(null) // The ID of the session awaiting delete confirmation, or null.
-  const [isModalOpen, setIsModalOpen] = useState(false) // Controls whether the "new chat" masterprompt modal is open.
-  const editInputRef = useRef<HTMLInputElement>(null) // Reference to the rename input — used to focus it when editing starts.
-  const { isDark, toggleDark } = useDarkMode() // Current theme state and toggle function from the dark mode hook.
+  // router is the Next.js router object used to navigate programmatically (e.g. after delete, logout).
+  const router = useRouter()
+  // params is an object containing the current URL params — used to read [sessionId] and highlight the active session.
+  const params = useParams()
+  // supabase is the browser-side Supabase client instance used for all database and auth operations.
+  const supabase = createClient()
+
+  // sessions is an array of ChatSession objects — the list of chat sessions shown in the sidebar.
+  const [sessions, setSessions] = useState<ChatSession[]>([])
+  // loading is a boolean state variable — true while sessions are being fetched, showing skeleton placeholders.
+  const [loading, setLoading] = useState(true)
+  // editingId is a string or null state variable — the ID of the session currently being renamed, or null if none.
+  const [editingId, setEditingId] = useState<string | null>(null)
+  // editTitle is a string state variable — the current value in the rename input field.
+  const [editTitle, setEditTitle] = useState('')
+  // deletingId is a string or null state variable — the ID of the session awaiting delete confirmation, or null.
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  // isModalOpen is a boolean state variable — controls whether the "new chat" masterprompt modal is visible.
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  // editInputRef is a React ref object pointing to the rename <input> element, used to focus and select text when editing starts.
+  const editInputRef = useRef<HTMLInputElement>(null)
+  // isDark is a boolean value from the dark mode hook representing the current theme state (true = dark mode active).
+  // toggleDark is a function from the dark mode hook that switches between light and dark mode.
+  const { isDark, toggleDark } = useDarkMode()
 
   // Loads the session list when the sidebar first mounts.
   useEffect(() => {
@@ -47,6 +102,17 @@ export default function Sidebar() {
     }
   }, [editingId])
 
+  /*
+   * loadSessions is an async function that takes no parameters and returns Promise<void>.
+   *
+   * Algorithm steps:
+   *   1. Set loading to true to show skeleton placeholders.
+   *   2. Fetch the currently authenticated user from Supabase auth; silently exit if not logged in.
+   *   3. Query the `chat_sessions` table for all rows belonging to this user, selecting only
+   *      the three fields in ChatSession, ordered by created_at descending (newest first).
+   *   4. Store the result in `sessions` state; fall back to an empty array if no data is returned.
+   *   5. Set loading to false to hide the skeletons.
+   */
   // Fetches all chat sessions belonging to the currently logged-in user, sorted newest first.
   async function loadSessions() {
     setLoading(true)
@@ -63,6 +129,21 @@ export default function Sidebar() {
     setLoading(false)
   }
 
+  /*
+   * formatDate is a function that takes one parameter (dateStr: string) and returns a string.
+   *
+   * It converts an ISO 8601 timestamp string into a human-readable Danish relative date:
+   *   - Same day     → "I dag"
+   *   - 1 day ago    → "I går"
+   *   - 2-6 days ago → "{n} dage siden"
+   *   - 7+ days ago  → a short Danish locale date, e.g. "18. mar"
+   *
+   * Parameters:
+   *   dateStr — an ISO 8601 date-time string, as stored in the Supabase `created_at` column.
+   *
+   * Returns:
+   *   A Danish string representing how long ago the session was created.
+   */
   // Formats an ISO timestamp as a human-readable relative date string (e.g. "I dag", "I går", "3 dage siden").
   function formatDate(dateStr: string) {
     const date = new Date(dateStr)
@@ -77,12 +158,29 @@ export default function Sidebar() {
     return date.toLocaleDateString('da-DK', { month: 'short', day: 'numeric' })
   }
 
+  /*
+   * handleLogout is an async function that takes no parameters and returns Promise<void>.
+   *
+   * It calls the Supabase auth signOut method to invalidate the current session token,
+   * then navigates the browser to /login.
+   */
   // Signs the user out and redirects them to the login page.
   async function handleLogout() {
     await supabase.auth.signOut()
     router.push('/login')
   }
 
+  /*
+   * startRename is a function that takes one parameter (session: ChatSession) and returns void.
+   *
+   * It enters rename mode for the given session by:
+   *   1. Storing the session's ID in editingId so the list renders an input for that row.
+   *   2. Pre-filling editTitle with the session's current title.
+   *   3. Clearing any pending delete confirmation (deletingId) to avoid two active states at once.
+   *
+   * Parameters:
+   *   session — the ChatSession object whose title is to be renamed.
+   */
   // Enters rename mode for a session: stores its ID and current title so the edit input is pre-filled.
   // Also closes any pending delete confirmation to avoid two active states at once.
   function startRename(session: ChatSession) {
@@ -91,6 +189,19 @@ export default function Sidebar() {
     setDeletingId(null)
   }
 
+  /*
+   * saveRename is an async function that takes one parameter (sessionId: string) and returns Promise<void>.
+   *
+   * Algorithm steps:
+   *   1. Trim whitespace from editTitle and normalise em dashes to hyphens.
+   *   2. If the result is empty, exit rename mode without saving (empty titles are not allowed).
+   *   3. Update the `title` column in the `chat_sessions` row with the matching ID.
+   *   4. Update the local `sessions` array optimistically so the UI reflects the change immediately.
+   *   5. Clear editingId to exit rename mode.
+   *
+   * Parameters:
+   *   sessionId — the string UUID of the session whose title is being saved.
+   */
   // Saves the new title to Supabase and updates the local session list optimistically.
   async function saveRename(sessionId: string) {
     const trimmed = editTitle.trim().replace(/—/g, '-') // Normalises em dashes to hyphens for consistency.
@@ -113,11 +224,29 @@ export default function Sidebar() {
     setEditingId(null) // Exits rename mode.
   }
 
+  /*
+   * cancelRename is a function that takes no parameters and returns void.
+   *
+   * It exits rename mode by setting editingId to null, discarding any edits the user made
+   * to editTitle without persisting them to the database.
+   */
   // Cancels renaming without saving — discards any edits.
   function cancelRename() {
     setEditingId(null)
   }
 
+  /*
+   * handleRenameKeyDown is a function that takes two parameters
+   * (e: React.KeyboardEvent, sessionId: string) and returns void.
+   *
+   * It handles keyboard shortcuts in the rename <input>:
+   *   - Enter: prevents default form submission and calls saveRename.
+   *   - Escape: calls cancelRename to discard the edit.
+   *
+   * Parameters:
+   *   e         — the React keyboard event fired by the input element.
+   *   sessionId — the string UUID of the session being renamed, forwarded to saveRename.
+   */
   // Handles keyboard shortcuts in the rename input: Enter saves, Escape cancels.
   function handleRenameKeyDown(e: React.KeyboardEvent, sessionId: string) {
     if (e.key === 'Enter') {
@@ -128,6 +257,20 @@ export default function Sidebar() {
     }
   }
 
+  /*
+   * confirmDelete is an async function that takes one parameter (sessionId: string) and returns Promise<void>.
+   *
+   * Algorithm steps:
+   *   1. Delete all rows in the `messages` table where session_id equals sessionId.
+   *      (Must happen first because of the foreign-key constraint referencing chat_sessions.id.)
+   *   2. Delete the session row itself from `chat_sessions`.
+   *   3. Remove the deleted session from the local `sessions` array.
+   *   4. Clear deletingId to exit the delete confirmation UI.
+   *   5. If the deleted session is the one currently open (matched via URL params), redirect to /builder.
+   *
+   * Parameters:
+   *   sessionId — the string UUID of the session to permanently delete.
+   */
   // Permanently deletes a session and all its messages from the database.
   // Messages must be deleted first because of the foreign-key constraint on session_id.
   async function confirmDelete(sessionId: string) {
@@ -178,8 +321,11 @@ export default function Sidebar() {
           <p className="text-xs text-gray-400 text-center mt-8">Ingen chats endnu</p>
         ) : (
           sessions.map((session) => {
+            // isActive is a boolean constant — true when this session's ID matches the current URL segment.
             const isActive = params?.sessionId === session.id
+            // isEditing is a boolean constant — true when this session is being renamed.
             const isEditing = editingId === session.id
+            // isDeleting is a boolean constant — true when this session is awaiting delete confirmation.
             const isDeleting = deletingId === session.id
 
             // Delete confirmation view
