@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 // Imports the browser-side Supabase client to create a new chat session in the database.
 import { createClient } from '@/lib/supabase'
 import { useLanguage } from '@/lib/LanguageContext'
+import type { Language } from '@/lib/translations'
 
 // Describes the configuration shape for each of the three building blocks (Role, Context, Restriction).
 interface BlockConfig {
@@ -82,7 +83,7 @@ const RESTRICTION_OPTIONS = [
 export default function MasterpromptBuilder() {
   const router = useRouter()
   const supabase = createClient()
-  const { t, tValue } = useLanguage()
+  const { t, tValue, lang } = useLanguage()
   // Tracks the currently selected value for each dropdown (role, grade, subject).
   // Initialised to the first option in each list so the preview is always populated.
   const [selections, setSelections] = useState<Record<string, string>>({
@@ -120,6 +121,15 @@ export default function MasterpromptBuilder() {
       .map((opt) => opt.prompt) // Uses the machine-readable prompt phrase, not the UI label.
     if (selected.length === 1) return selected[0]
     return selected.slice(0, -1).join(', ') + ' og ' + selected[selected.length - 1]
+  }
+
+  function buildRestrictionDisplay(): string {
+    const selected = RESTRICTION_OPTIONS
+      .filter((_, i) => checkedRestrictions[i])
+      .map((opt) => tValue(opt.prompt))
+    if (selected.length === 1) return selected[0]
+    const connector = lang === 'en' ? ' and ' : ' og '
+    return selected.slice(0, -1).join(', ') + connector + selected[selected.length - 1]
   }
 
   // Assembles the complete masterprompt string from the current selections and restrictions.
@@ -329,7 +339,7 @@ export default function MasterpromptBuilder() {
                   className="rounded px-1.5 py-0.5 font-medium"
                   style={{ backgroundColor: BLOCKS[2].color.bg }}
                 >
-                  {buildRestrictionText()}
+                  {buildRestrictionDisplay()}
                 </span>
               </p>
             </div>

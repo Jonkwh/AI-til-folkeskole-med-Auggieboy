@@ -4,6 +4,7 @@
 // Imports the useState hook to track whether the card is expanded or collapsed.
 import { useState } from 'react'
 import { useLanguage } from '@/lib/LanguageContext'
+import { VALUE_TRANSLATIONS, type Language } from '@/lib/translations'
 
 // Props accepted by MasterpromptCard.
 interface MasterpromptCardProps {
@@ -94,12 +95,38 @@ function parseMasterprompt(text: string): ParsedValues | null {
   }
 }
 
+const KNOWN_VALUES_BY_LENGTH = Object.keys(VALUE_TRANSLATIONS).sort(
+  (a, b) => b.length - a.length,
+)
+
+function translateRestriction(text: string, tValue: (s: string) => string, lang: Language): string {
+  const direct = tValue(text)
+  if (direct !== text) return direct
+
+  const parts: string[] = []
+  let remaining = text
+  while (remaining.length > 0) {
+    const match = KNOWN_VALUES_BY_LENGTH.find((k) => remaining.startsWith(k))
+    if (match) {
+      parts.push(tValue(match))
+      remaining = remaining.slice(match.length)
+      remaining = remaining.replace(/^(, | og )/, '')
+    } else {
+      parts.push(remaining)
+      break
+    }
+  }
+  if (parts.length <= 1) return parts[0] || text
+  const connector = lang === 'en' ? ' and ' : ' og '
+  return parts.slice(0, -1).join(', ') + connector + parts[parts.length - 1]
+}
+
 // Collapsible summary card shown at the top of the chat view.
 // Displays the masterprompt as colour-coded chips so the student can see what the bot is configured to do.
 export default function MasterpromptCard({ masterprompt, defaultExpanded }: MasterpromptCardProps) {
   // Controls whether the chip summary is visible or hidden below the toggle button.
   const [expanded, setExpanded] = useState(defaultExpanded)
-  const { t, tValue } = useLanguage()
+  const { t, tValue, lang } = useLanguage()
   // Parses the raw masterprompt string into structured role/grade/subject/restriction values.
   const parsed = parseMasterprompt(masterprompt)
 
@@ -138,7 +165,7 @@ export default function MasterpromptCard({ masterprompt, defaultExpanded }: Mast
           {parsed.restriction && (
             <>
               <span className={connectorClass}>{t('card.connector.never')}</span>
-              <span style={chipStyle(CHIP_COLORS.restriction)}>{parsed.restriction}</span>
+              <span style={chipStyle(CHIP_COLORS.restriction)}>{translateRestriction(parsed.restriction, tValue, lang)}</span>
             </>
           )}
           {/* Closing period to make the summary read as a complete sentence. */}

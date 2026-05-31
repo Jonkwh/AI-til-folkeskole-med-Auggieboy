@@ -169,6 +169,28 @@ export const VALUE_TRANSLATIONS: Record<string, Record<Language, string>> = {
     en: 'Stick to the topic or text the student mentions at the start, and do not move on to other topics',
   },
 
+  // ── Restriction prompt values (stored in masterprompt after "Aldrig") ──
+  'bruge eksempler fra andre tekster eller emner end dem eleven arbejder med': {
+    da: 'bruge eksempler fra andre tekster eller emner end dem eleven arbejder med',
+    en: 'use examples from texts or topics other than what the student is working with',
+  },
+  'skifte til et andet sprog end dansk, selvom eleven gør det': {
+    da: 'skifte til et andet sprog end dansk, selvom eleven gør det',
+    en: 'switch to another language than Danish, even if the student does',
+  },
+  'give eksempler fra forfattere, film eller tekster som eleven ikke selv har nævnt': {
+    da: 'give eksempler fra forfattere, film eller tekster som eleven ikke selv har nævnt',
+    en: 'give examples from authors, films, or texts the student has not mentioned',
+  },
+  'bruge fagtermer uden at forklare dem først': {
+    da: 'bruge fagtermer uden at forklare dem først',
+    en: 'use technical terms without explaining them first',
+  },
+  'gå videre til andre emner end det emne eller den tekst, eleven nævner i starten': {
+    da: 'gå videre til andre emner end det emne eller den tekst, eleven nævner i starten',
+    en: 'move on to other topics than the one the student mentions at the start',
+  },
+
   // ── Re-engagement options ──────────────────────────────────────────────
   'Giv mig et hint': { da: 'Giv mig et hint', en: 'Give me a hint' },
   'Prøv et nyt spørgsmål': { da: 'Prøv et nyt spørgsmål', en: 'Try a new question' },
