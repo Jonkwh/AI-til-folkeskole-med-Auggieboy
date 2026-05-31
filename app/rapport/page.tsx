@@ -3,6 +3,7 @@
 
 // Imports useState to manage auth state, date range selections, and the fetched report result.
 import { useState } from 'react'
+import { useLanguage } from '@/lib/LanguageContext'
 
 // Hardcoded teacher password — intentionally simple for prototype use.
 // Replace with proper auth in a future iteration.
@@ -51,6 +52,8 @@ interface ApiResult {
 // The teacher dashboard for generating class-level reports based on student chat activity.
 // Protected by a simple password gate — the dashboard itself is publicly accessible by URL.
 export default function RapportPage() {
+  const { t, toggleLanguage } = useLanguage()
+
   // ── Auth state ────────────────────────────────────────────────────────
   const [authenticated, setAuthenticated] = useState(false) // True after the correct password is entered.
   const [passwordInput, setPasswordInput] = useState('') // Tracks the value typed in the password field.
@@ -97,7 +100,7 @@ export default function RapportPage() {
       const data: ApiResult = await res.json()
       setResult(data) // Stores the report so the UI can render the three section cards.
     } catch {
-      setFetchError('Kunne ikke generere rapport. Prøv igen.')
+      setFetchError(t('rapport.error'))
     } finally {
       setLoading(false)
     }
@@ -108,18 +111,26 @@ export default function RapportPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="w-full max-w-sm bg-white border border-gray-200 rounded-xl shadow-sm p-8 flex flex-col gap-4">
-          <div>
-            <h1 style={{ fontSize: 20, fontWeight: 500 }} className="text-gray-900">
-              Lærerrapport
-            </h1>
-            <p style={{ fontSize: 13 }} className="text-gray-500 mt-1">
-              Indtast adgangskoden for at se klassens rapport.
-            </p>
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 style={{ fontSize: 20, fontWeight: 500 }} className="text-gray-900">
+                {t('rapport.loginTitle')}
+              </h1>
+              <p style={{ fontSize: 13 }} className="text-gray-500 mt-1">
+                {t('rapport.loginDescription')}
+              </p>
+            </div>
+            <button
+              onClick={toggleLanguage}
+              className="px-3 py-1 rounded-lg text-xs font-medium border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors flex-shrink-0"
+            >
+              {t('lang.toggle')}
+            </button>
           </div>
 
           <input
             type="password"
-            placeholder="Adgangskode"
+            placeholder={t('rapport.password.placeholder')}
             value={passwordInput}
             onChange={(e) => {
               setPasswordInput(e.target.value)
@@ -131,7 +142,7 @@ export default function RapportPage() {
 
           {passwordError && (
             <p style={{ fontSize: 12 }} className="text-red-600">
-              Forkert adgangskode.
+              {t('rapport.password.wrong')}
             </p>
           )}
 
@@ -139,7 +150,7 @@ export default function RapportPage() {
             onClick={handleLogin}
             className="w-full bg-gray-900 text-white text-sm font-medium py-2 rounded-lg hover:bg-gray-700 transition-colors"
           >
-            Log ind
+            {t('rapport.password.submit')}
           </button>
         </div>
       </div>
@@ -153,13 +164,21 @@ export default function RapportPage() {
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
-          <h1 style={{ fontSize: 22, fontWeight: 600 }} className="text-gray-900">
-            Klasserapport
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 style={{ fontSize: 22, fontWeight: 600 }} className="text-gray-900">
+              {t('rapport.title')}
+            </h1>
+            <button
+              onClick={toggleLanguage}
+              className="px-3 py-1 rounded-lg text-xs font-medium border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors"
+            >
+              {t('lang.toggle')}
+            </button>
+          </div>
 
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-3">
-              <label className="text-sm text-gray-500 w-6">Fra</label>
+              <label className="text-sm text-gray-500 w-6">{t('rapport.from')}</label>
               <input
                 type="date"
                 value={from}
@@ -169,7 +188,7 @@ export default function RapportPage() {
               />
             </div>
             <div className="flex items-center gap-3">
-              <label className="text-sm text-gray-500 w-6">Til</label>
+              <label className="text-sm text-gray-500 w-6">{t('rapport.to')}</label>
               <input
                 type="date"
                 value={to}
@@ -184,12 +203,12 @@ export default function RapportPage() {
               disabled={loading}
               className="bg-gray-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Genererer…' : 'Generer rapport'}
+              {loading ? t('rapport.generating') : t('rapport.generate')}
             </button>
 
             {result && (
               <p className="text-xs text-gray-400 text-right">
-                {result.sessionCount} samtaler fundet i perioden
+                {result.sessionCount} {t('rapport.sessionsFound')}
               </p>
             )}
           </div>
@@ -207,7 +226,7 @@ export default function RapportPage() {
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
-            <span className="text-sm">Analyserer samtaler…</span>
+            <span className="text-sm">{t('rapport.analyzing')}</span>
           </div>
         )}
 
@@ -217,7 +236,7 @@ export default function RapportPage() {
 
         {!loading && result && result.sessionCount === 0 && (
           <p className="text-sm text-gray-500 py-12 text-center">
-            Ingen samtaler fundet i den valgte periode.
+            {t('rapport.noSessions')}
           </p>
         )}
 
@@ -225,33 +244,33 @@ export default function RapportPage() {
           <div className="flex flex-col gap-4">
             {result.truncated && (
               <p className="text-xs text-gray-400">
-                Bemærk: Rapporten er baseret på de 15 nyeste samtaler i perioden.
+                {t('rapport.truncated')}
               </p>
             )}
 
             {/* Report card */}
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
               <Section
-                title="Forstået godt"
+                title={t('rapport.section.understood')}
                 content={result.report.understood}
                 borderColor="#5DCAA5"
               />
               <div className="border-t border-gray-100" />
               <Section
-                title="Forvirring og udfordringer"
+                title={t('rapport.section.confusion')}
                 content={result.report.confusion}
                 borderColor="#EF9F27"
               />
               <div className="border-t border-gray-100" />
               <Section
-                title="Kan arbejdes videre med"
+                title={t('rapport.section.nextSteps')}
                 content={result.report.nextSteps}
                 borderColor="#85B7EB"
               />
             </div>
 
             <p className="text-xs text-gray-400 text-right">
-              Rapport genereret: {formatTime(result.generatedAt)}
+              {t('rapport.generatedAt')} {formatTime(result.generatedAt)}
             </p>
           </div>
         )}

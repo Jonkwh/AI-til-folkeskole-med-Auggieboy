@@ -2,6 +2,7 @@
 import type { Metadata } from 'next'
 // Imports the global CSS file that applies to every page in the app.
 import './globals.css'
+import Providers from '@/components/Providers'
 
 // Defines the default browser tab title and meta description for the entire app.
 export const metadata: Metadata = {
@@ -24,7 +25,7 @@ export default function RootLayout({
       </head>
       {/* Applies base font, anti-aliasing, and the CSS variable–driven background and text colors. */}
       <body className="font-sans antialiased bg-[var(--bg-app)] text-gray-900 dark:text-gray-100">
-        {children} {/* Renders the active page inside the shared layout. */}
+        <Providers>{children}</Providers>
       </body>
     </html>
   )

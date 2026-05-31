@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 // Imports the browser-side Supabase client to create a new chat session in the database.
 import { createClient } from '@/lib/supabase'
+import { useLanguage } from '@/lib/LanguageContext'
 
 // Describes the configuration shape for each of the three building blocks (Role, Context, Restriction).
 interface BlockConfig {
@@ -81,6 +82,7 @@ const RESTRICTION_OPTIONS = [
 export default function MasterpromptBuilder() {
   const router = useRouter()
   const supabase = createClient()
+  const { t, tValue } = useLanguage()
   // Tracks the currently selected value for each dropdown (role, grade, subject).
   // Initialised to the first option in each list so the preview is always populated.
   const [selections, setSelections] = useState<Record<string, string>>({
@@ -177,9 +179,9 @@ export default function MasterpromptBuilder() {
     <div className="flex flex-col lg:flex-row gap-8 w-full max-w-6xl mx-auto p-6">
       {/* Left: Block Builder */}
       <div className="flex-1 min-w-0">
-        <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-1">Byg din masterprompt</h2>
+        <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-1">{t('builder.title')}</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-          Konfigurer hvordan ThinkBot skal opføre sig i denne chatsession.
+          {t('builder.subtitle')}
         </p>
 
         <div className="relative space-y-4">
@@ -206,7 +208,7 @@ export default function MasterpromptBuilder() {
                     className="text-xs font-bold uppercase tracking-wider"
                     style={{ color: block.color.text }}
                   >
-                    {block.label}
+                    {block.label === "AI'EN SKAL" ? t('builder.block.aiShall') : block.label === 'KONTEKST' ? t('builder.block.context') : t('builder.block.restriction')}
                   </span>
                 </div>
 
@@ -257,18 +259,20 @@ export default function MasterpromptBuilder() {
                             )}
                           </span>
                         </span>
-                        <span style={{ color: '#1a1a18' }}>{opt.label}</span>
+                        <span style={{ color: '#1a1a18' }}>{tValue(opt.label)}</span>
                       </label>
                     ))}
                   </div>
                 ) : (
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium text-gray-800">{block.prefix}</span>
+                    <span className="text-sm font-medium text-gray-800">
+                      {block.label === "AI'EN SKAL" ? t('builder.prefix.aiShall') : block.label === 'KONTEKST' ? t('builder.prefix.context') : block.prefix}
+                    </span>
                     {block.dropdowns.map((dropdown, dIdx) => (
                       <span key={dropdown.key} className="flex items-center gap-2">
                         {dIdx > 0 && (
                           <span className="text-sm text-gray-600">
-                            {block.label === 'KONTEKST' ? 'i' : ''}
+                            {block.label === 'KONTEKST' ? t('builder.connector.in') : ''}
                           </span>
                         )}
                         <select
@@ -279,14 +283,16 @@ export default function MasterpromptBuilder() {
                         >
                           {dropdown.options.map((opt) => (
                             <option key={opt} value={opt}>
-                              {opt}
+                              {tValue(opt)}
                             </option>
                           ))}
                         </select>
                       </span>
                     ))}
                     {block.suffix && (
-                      <span className="text-sm font-medium text-gray-800">{block.suffix}</span>
+                      <span className="text-sm font-medium text-gray-800">
+                        {block.label === 'KONTEKST' ? t('builder.suffix.context') : block.suffix}
+                      </span>
                     )}
                   </div>
                 )}
@@ -299,7 +305,7 @@ export default function MasterpromptBuilder() {
       {/* Right: Live Preview */}
       <div className="lg:w-96 flex-shrink-0">
         <div className="sticky top-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Forhåndsvisning</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">{t('builder.preview')}</h3>
           <div className="rounded-xl border border-[var(--border)] bg-white dark:bg-[#2d2d30] p-5 shadow-sm">
             <div className="space-y-2 text-sm leading-relaxed">
               <p>
@@ -307,7 +313,7 @@ export default function MasterpromptBuilder() {
                   className="rounded px-1.5 py-0.5 font-medium"
                   style={{ backgroundColor: BLOCKS[0].color.bg }}
                 >
-                  AI&apos;en skal {selections.role}
+                  {t('builder.prefix.aiShall')}{tValue(selections.role)}
                 </span>
               </p>
               <p>
@@ -315,7 +321,7 @@ export default function MasterpromptBuilder() {
                   className="rounded px-1.5 py-0.5 font-medium"
                   style={{ backgroundColor: BLOCKS[1].color.bg }}
                 >
-                  for elever i {selections.grade} i {selections.subject} i en dansk skole
+                  {t('builder.prefix.context')}{tValue(selections.grade)} {t('builder.connector.in')} {tValue(selections.subject)}{t('builder.suffix.context')}
                 </span>
               </p>
               <p>
@@ -323,14 +329,14 @@ export default function MasterpromptBuilder() {
                   className="rounded px-1.5 py-0.5 font-medium"
                   style={{ backgroundColor: BLOCKS[2].color.bg }}
                 >
-                  Aldrig {buildRestrictionText()}
+                  {buildRestrictionText()}
                 </span>
               </p>
             </div>
 
             <div className="mt-4 pt-3 border-t border-[var(--border)] flex items-center justify-between">
               <span className="text-xs text-gray-400">
-                ~{tokenCount} tokens
+                ~{tokenCount} {t('builder.tokens')}
               </span>
             </div>
           </div>
@@ -340,7 +346,7 @@ export default function MasterpromptBuilder() {
             disabled={loading}
             className="mt-4 w-full py-3 px-6 rounded-xl bg-gray-900 text-white font-medium text-sm hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Opretter session...' : 'Start chat →'}
+            {loading ? t('builder.creating') : t('builder.startChat')}
           </button>
         </div>
       </div>

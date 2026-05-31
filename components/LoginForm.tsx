@@ -7,12 +7,14 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 // Imports the Supabase browser client factory for authentication operations.
 import { createClient } from '@/lib/supabase'
+import { useLanguage } from '@/lib/LanguageContext'
 
 // The login and sign-up form — teachers use this to access ThinkBot.
 // Toggling between login and sign-up modes is handled by the isSignUp state variable.
 export default function LoginForm() {
   const router = useRouter() // Used to redirect to /builder after successful authentication.
   const supabase = createClient() // Browser-side Supabase client for auth calls.
+  const { t, toggleLanguage } = useLanguage()
   const [email, setEmail] = useState('') // Tracks the value typed in the email input.
   const [password, setPassword] = useState('') // Tracks the value typed in the password input.
   const [confirmPassword, setConfirmPassword] = useState('') // Tracks the confirmation password, only used during sign-up.
@@ -28,7 +30,7 @@ export default function LoginForm() {
 
     // Client-side validation: passwords must match before hitting the Supabase API.
     if (isSignUp && password !== confirmPassword) {
-      setError('Adgangskoderne stemmer ikke overens')
+      setError(t('login.error.mismatch'))
       setLoading(false)
       return
     }
@@ -47,7 +49,7 @@ export default function LoginForm() {
       }
     } catch (err: unknown) {
       // Extracts the error message from the Supabase error object and shows it in the form.
-      const message = err instanceof Error ? err.message : 'Der opstod en fejl'
+      const message = err instanceof Error ? err.message : t('login.error.generic')
       setError(message)
     } finally {
       setLoading(false) // Re-enables the submit button regardless of whether the request succeeded or failed.
@@ -57,25 +59,35 @@ export default function LoginForm() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--bg-app)] px-4">
       <div className="w-full max-w-sm">
+        {/* Language toggle */}
+        <div className="flex justify-end mb-2">
+          <button
+            onClick={toggleLanguage}
+            className="px-3 py-1 rounded-lg text-xs font-medium border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors"
+          >
+            {t('lang.toggle')}
+          </button>
+        </div>
+
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-gray-900 flex items-center justify-center mx-auto mb-4">
             <span className="text-white text-xl font-bold">TB</span>
           </div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">ThinkBot</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">AI til kritisk tænkning</p>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{t('login.title')}</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('login.subtitle')}</p>
         </div>
 
         {/* Form */}
         <div className="bg-white border border-[#e5e3d9] rounded-2xl p-6 shadow-sm">
           <h2 className="text-lg font-medium text-gray-900 mb-4">
-            {isSignUp ? 'Opret en konto' : 'Log ind'}
+            {isSignUp ? t('login.heading.signup') : t('login.heading.login')}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email
+                {t('login.email')}
               </label>
               <input
                 id="email"
@@ -84,13 +96,13 @@ export default function LoginForm() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent"
-                placeholder="dig@skole.dk"
+                placeholder={t('login.email.placeholder')}
               />
             </div>
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Adgangskode
+                {t('login.password')}
               </label>
               <input
                 id="password"
@@ -100,14 +112,14 @@ export default function LoginForm() {
                 required
                 minLength={6}
                 className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent"
-                placeholder="Min. 6 tegn"
+                placeholder={t('login.password.placeholder')}
               />
             </div>
 
             {isSignUp && (
               <div>
                 <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                  Gentag adgangskode
+                  {t('login.confirmPassword')}
                 </label>
                 <input
                   id="confirmPassword"
@@ -116,11 +128,11 @@ export default function LoginForm() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent"
-                  placeholder="Gentag din adgangskode"
+                  placeholder={t('login.confirmPassword.placeholder')}
                 />
                 {confirmPassword && (
                   <p className={`text-sm mt-1 ${password === confirmPassword ? 'text-green-600' : 'text-red-600'}`}>
-                    {password === confirmPassword ? 'Adgangskoderne matcher' : 'Adgangskoderne stemmer ikke overens'}
+                    {password === confirmPassword ? t('login.passwordMatch') : t('login.passwordMismatch')}
                   </p>
                 )}
               </div>
@@ -137,7 +149,7 @@ export default function LoginForm() {
               disabled={loading}
               className="w-full py-2.5 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Vent venligst...' : isSignUp ? 'Opret konto' : 'Log ind'}
+              {loading ? t('login.loading') : isSignUp ? t('login.submit.signup') : t('login.submit.login')}
             </button>
           </form>
 
@@ -150,7 +162,7 @@ export default function LoginForm() {
               }}
               className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
             >
-              {isSignUp ? 'Har du allerede en konto? Log ind' : 'Har du ikke en konto? Opret en'}
+              {isSignUp ? t('login.toggle.toLogin') : t('login.toggle.toSignup')}
             </button>
           </div>
         </div>

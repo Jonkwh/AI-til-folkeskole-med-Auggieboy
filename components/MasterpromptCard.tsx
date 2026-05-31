@@ -3,6 +3,7 @@
 
 // Imports the useState hook to track whether the card is expanded or collapsed.
 import { useState } from 'react'
+import { useLanguage } from '@/lib/LanguageContext'
 
 // Props accepted by MasterpromptCard.
 interface MasterpromptCardProps {
@@ -98,6 +99,7 @@ function parseMasterprompt(text: string): ParsedValues | null {
 export default function MasterpromptCard({ masterprompt, defaultExpanded }: MasterpromptCardProps) {
   // Controls whether the chip summary is visible or hidden below the toggle button.
   const [expanded, setExpanded] = useState(defaultExpanded)
+  const { t, tValue } = useLanguage()
   // Parses the raw masterprompt string into structured role/grade/subject/restriction values.
   const parsed = parseMasterprompt(masterprompt)
 
@@ -114,32 +116,28 @@ export default function MasterpromptCard({ masterprompt, defaultExpanded }: Mast
         onClick={() => setExpanded(!expanded)}
         className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400 bg-none border-none cursor-pointer p-0 mb-1 transition-colors"
       >
-        {expanded ? '▲ Skjul masterprompt' : '▾ Vis masterprompt'}
+        {expanded ? t('card.hide') : t('card.show')}
       </button>
 
       {/* Chip summary — only rendered when the card is expanded. */}
       {expanded && (
         <div className="rounded-[10px] border border-[var(--border)] bg-white dark:bg-[#2d2d30] px-4 py-2.5">
-          {/* Connector text + role chip: e.g. "AI'en skal [hjælpe med at forstå opgaven]" */}
-          <span className={connectorClass}>{isNewFormat ? "AI'en skal " : 'Du er en '}</span>
-          <span style={chipStyle(CHIP_COLORS.role)}>{parsed.role}</span>
+          <span className={connectorClass}>{isNewFormat ? t('card.prefix.new') : t('card.prefix.legacy')}</span>
+          <span style={chipStyle(CHIP_COLORS.role)}>{tValue(parsed.role)}</span>
           {parsed.grade && (
             <>
-              {/* Context chip: grade and optionally subject, e.g. "[8. klasse i Dansk]" */}
-              <span className={connectorClass}> for elever i </span>
+              <span className={connectorClass}>{t('card.connector.for')}</span>
               <span style={chipStyle(CHIP_COLORS.context)}>
-                {parsed.grade}{parsed.subject ? ` i ${parsed.subject}` : ''}
+                {tValue(parsed.grade)}{parsed.subject ? `${t('card.connector.in')}${tValue(parsed.subject)}` : ''}
               </span>
-              {/* Appends the school-context phrase when present in the original prompt. */}
               {parsed.hasDanskSkole && (
-                <span className={connectorClass}> i en dansk skole</span>
+                <span className={connectorClass}>{t('card.connector.school')}</span>
               )}
             </>
           )}
           {parsed.restriction && (
             <>
-              {/* Restriction chip: e.g. ". Aldrig [skifte til et andet sprog]" */}
-              <span className={connectorClass}>. Aldrig </span>
+              <span className={connectorClass}>{t('card.connector.never')}</span>
               <span style={chipStyle(CHIP_COLORS.restriction)}>{parsed.restriction}</span>
             </>
           )}

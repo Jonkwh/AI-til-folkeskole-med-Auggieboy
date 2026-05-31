@@ -3,6 +3,7 @@
 
 // Imports hooks: useState for component state, useEffect to trigger side effects (report generation).
 import { useState, useEffect } from 'react'
+import { useLanguage } from '@/lib/LanguageContext'
 
 // Minimal message shape used here — only role and content are needed to generate the report.
 interface Message {
@@ -18,6 +19,7 @@ interface ShareButtonProps {
 
 // The "Del med lærer" button and its associated modal for previewing and sending the chat report.
 export default function ShareButton({ messages, masterprompt }: ShareButtonProps) {
+  const { t } = useLanguage()
   const [open, setOpen] = useState(false) // Controls whether the share modal is visible.
   const [transcript, setTranscript] = useState('') // Holds the generated plain-text report shown in the preview area.
   const [loading, setLoading] = useState(false) // True while the email send request is in flight.
@@ -43,7 +45,7 @@ export default function ShareButton({ messages, masterprompt }: ShareButtonProps
         return res.text() // The API returns plain text, not JSON.
       })
       .then((text) => setTranscript(text)) // Stores the generated report in state to display in the preview textarea.
-      .catch(() => setError('Kunne ikke generere rapport. Prøv igen.'))
+      .catch(() => setError(t('share.error')))
       .finally(() => setGenerating(false))
   }, [open, messages, masterprompt]) // Re-runs whenever the modal is opened or the messages change.
 
@@ -72,7 +74,7 @@ export default function ShareButton({ messages, masterprompt }: ShareButtonProps
         setSent(false)
       }, 2000)
     } catch {
-      setError('Kunne ikke sende email. Prøv igen.')
+      setError(t('share.sendError'))
     } finally {
       setLoading(false)
     }
@@ -86,7 +88,7 @@ export default function ShareButton({ messages, masterprompt }: ShareButtonProps
         disabled={messages.length === 0}
         className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] text-gray-600 dark:text-gray-400 hover:bg-[var(--bg-panel)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        Del med lærer
+        {t('share.button')}
       </button>
 
       {/* The share modal — only rendered when open is true. */}
@@ -96,7 +98,7 @@ export default function ShareButton({ messages, masterprompt }: ShareButtonProps
             {/* Modal header with title and close button. */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
               <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                Del samtale med lærer
+                {t('share.title')}
               </h2>
               <button
                 onClick={() => setOpen(false)}
@@ -109,7 +111,7 @@ export default function ShareButton({ messages, masterprompt }: ShareButtonProps
             {/* Modal body — shows a spinner while generating, then the report preview textarea. */}
             <div className="flex-1 overflow-hidden px-5 py-4 flex flex-col gap-3">
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Forhåndsvisning af det der sendes til din lærer.
+                {t('share.description')}
               </p>
 
               {generating ? (
@@ -124,7 +126,7 @@ export default function ShareButton({ messages, masterprompt }: ShareButtonProps
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  <span className="ml-3 text-sm text-gray-500">Genererer rapport…</span>
+                  <span className="ml-3 text-sm text-gray-500">{t('share.generating')}</span>
                 </div>
               ) : (
                 // Read-only preview of the report text. The student can scroll it but not edit it.
@@ -143,7 +145,7 @@ export default function ShareButton({ messages, masterprompt }: ShareButtonProps
               {/* Success confirmation shown briefly after the email is sent. */}
               {sent && (
                 <p className="text-sm text-green-600 dark:text-green-400">
-                  Email sendt til din lærer!
+                  {t('share.sent')}
                 </p>
               )}
             </div>
@@ -154,7 +156,7 @@ export default function ShareButton({ messages, masterprompt }: ShareButtonProps
                 onClick={() => setOpen(false)}
                 className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] text-gray-600 dark:text-gray-400 hover:bg-[var(--bg-panel)] transition-colors"
               >
-                Annuller
+                {t('share.cancel')}
               </button>
               {/* Send button — disabled while generating, loading, if there's nothing to send, or after a successful send. */}
               <button
@@ -174,10 +176,10 @@ export default function ShareButton({ messages, masterprompt }: ShareButtonProps
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
-                    Sender…
+                    {t('share.sending')}
                   </span>
                 ) : (
-                  'Send til lærer'
+                  t('share.sendButton')
                 )}
               </button>
             </div>

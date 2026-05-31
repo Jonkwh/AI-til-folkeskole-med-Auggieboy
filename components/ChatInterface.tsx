@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase'
 import ShareButton from './ShareButton'
 // Imports the collapsible masterprompt summary card shown above the message area.
 import MasterpromptCard from './MasterpromptCard'
+import { useLanguage } from '@/lib/LanguageContext'
 
 // The shape of a message in the conversation — used for both local state and Supabase rows.
 interface Message {
@@ -131,6 +132,7 @@ export default function ChatInterface({
   sessionTitle,
 }: ChatInterfaceProps) {
   const supabase = createClient() // Browser-side Supabase client used to persist messages.
+  const { t, tValue } = useLanguage()
   const [messages, setMessages] = useState<Message[]>(initialMessages) // The conversation history shown in the chat feed.
   const [input, setInput] = useState('') // The current value in the text input area.
   const [isStreaming, setIsStreaming] = useState(false) // True while a streaming response from Claude is in progress.
@@ -293,8 +295,8 @@ export default function ChatInterface({
         console.error(`Chat API returned ${status}`)
         const errorMessage =
           status === 429
-            ? 'ThinkBot er lidt overbelastet lige nu. Vent et øjeblik og prøv igen 🙂'
-            : 'Noget gik galt. Prøv at sende din besked igen.'
+            ? t('chat.error.overloaded')
+            : t('chat.error.generic')
         if (restoreInputOnError) setInput(restoreInputOnError)
         setMessages((prev) => {
           const updated = [...prev]
@@ -371,7 +373,7 @@ export default function ChatInterface({
         const updated = [...prev]
         updated[updated.length - 1] = {
           role: 'assistant',
-          content: 'Det ser ud til, at forbindelsen blev afbrudt. Tjek din internetforbindelse og prøv igen.',
+          content: t('chat.error.connection'),
           isError: true,
         }
         return updated
@@ -567,11 +569,11 @@ export default function ChatInterface({
   // The placeholder text adapts to the current interaction state to guide the student.
   const inputPlaceholder = !onboardingComplete
     ? step1Answer
-      ? 'Eller skriv dit eget svar...' // Step 2 of onboarding — the student can type instead of picking a card.
-      : 'Eller beskriv hvad du arbejder med...' // Step 1 of onboarding — invites free text.
+      ? t('chat.placeholder.onboarding2')
+      : t('chat.placeholder.onboarding1')
     : activeReEngagement
-    ? 'Vælg en mulighed ovenfor...' // Re-engagement card is showing — input is disabled.
-    : 'Skriv din besked...' // Normal chat mode.
+    ? t('chat.placeholder.reengagement')
+    : t('chat.placeholder.default')
 
   // ── Shared card class builder ───────────────────────────────────────────────
   // Returns the Tailwind class string for an option card given its selection state.
@@ -613,7 +615,7 @@ export default function ChatInterface({
           </div>
           <div>
             <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate max-w-xs">{title}</h2>
-            <p className="text-xs text-gray-400 dark:text-gray-500">ThinkBot</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">{t('chat.brand')}</p>
           </div>
         </div>
         <ShareButton messages={messages} masterprompt={masterprompt} />
@@ -634,7 +636,7 @@ export default function ChatInterface({
             {onboardingLoading && (
               <div className="flex justify-start animate-fade-in">
                 <div className="max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed bg-[var(--bg-panel)] text-gray-500 dark:text-gray-400 italic">
-                  Henter spørgsmål...
+                  {t('chat.onboarding.loading')}
                 </div>
               </div>
             )}
@@ -672,14 +674,14 @@ export default function ChatInterface({
                     className="border border-dashed border-[var(--border)] rounded-xl px-4 py-2 text-sm text-left transition-colors bg-[var(--bg-card)] hover:bg-[var(--bg-surface)] cursor-pointer"
                     style={{ color: 'var(--color-text-tertiary)', opacity: 0.7 }}
                   >
-                    <em>Skriv noget selv</em>
+                    <em>{t('chat.onboarding.writeOwn')}</em>
                   </button>
                 </div>
 
                 {/* Helper text — only visible while onboarding is incomplete */}
                 {!onboardingComplete && (
                   <p className="text-xs text-gray-400 dark:text-gray-500 pt-1">
-                    Vælg en mulighed, eller skriv dit eget svar nedenfor
+                    {t('chat.onboarding.helper')}
                   </p>
                 )}
 
@@ -697,7 +699,7 @@ export default function ChatInterface({
                     {step2Loading && (
                       <div className="flex justify-start animate-fade-in">
                         <div className="max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed bg-[var(--bg-panel)] text-gray-500 dark:text-gray-400 italic">
-                          Henter spørgsmål...
+                          {t('chat.onboarding.loading')}
                         </div>
                       </div>
                     )}
@@ -736,14 +738,14 @@ export default function ChatInterface({
                             className="border border-dashed border-[var(--border)] rounded-xl px-4 py-2 text-sm text-left transition-colors bg-[var(--bg-card)] hover:bg-[var(--bg-surface)] cursor-pointer"
                             style={{ color: 'var(--color-text-tertiary)', opacity: 0.7 }}
                           >
-                            <em>Skriv noget selv</em>
+                            <em>{t('chat.onboarding.writeOwn')}</em>
                           </button>
                         </div>
 
                         {/* Helper text — only visible while onboarding is incomplete */}
                         {!onboardingComplete && (
                           <p className="text-xs text-gray-400 dark:text-gray-500 pt-1">
-                            Vælg en mulighed, eller skriv dit eget svar nedenfor
+                            {t('chat.onboarding.helper')}
                           </p>
                         )}
                       </>
@@ -820,7 +822,7 @@ export default function ChatInterface({
                   {/* Bot bubble — amber styling signals a meta/strategic moment */}
                   <div className="flex justify-start">
                     <div className="max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed border bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200">
-                      Det ser ud til at vi er gået lidt i stå — det sker! Hvad ville hjælpe dig mest lige nu?
+                      {t('chat.reengagement.message')}
                     </div>
                   </div>
 
@@ -839,7 +841,7 @@ export default function ChatInterface({
                           className={cardClasses(isSelected, isFaded, !re.selectedOption, 'amber')}
                           style={cardStyle(isSelected, isFaded)}
                         >
-                          {option}
+                          {tValue(option)}
                         </button>
                       )
                     })}
@@ -870,17 +872,17 @@ export default function ChatInterface({
             disabled={sendDisabled}
             className="px-5 py-3 rounded-xl bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Send
+            {t('chat.send')}
           </button>
         </form>
         {rateLimited && (
           <p className="text-xs mt-2" style={{ color: '#854F0B' }}>
-            Vent et øjeblik, før du sender din næste besked 🙂
+            {t('chat.rateLimit')}
           </p>
         )}
         {assignmentBlocked && (
           <p className="text-xs mt-2" style={{ color: '#854F0B' }}>
-            ThinkBot skriver ikke opgaver, men hjælper dig gerne med at komme i gang 🙂 Prøv at fortælle, hvad du er gået i stå med.
+            {t('chat.assignmentBlocked')}
           </p>
         )}
       </div>
