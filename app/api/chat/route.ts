@@ -10,7 +10,7 @@ const anthropic = new Anthropic({
 // These are invisible to teachers and students — they are server-side only.
 const PEDAGOGICAL_RULES = `
 
-If you receive an INTERNAL NOTE marked OVERRIDE, follow it exactly and ignore any conflicting rules below for that response only.
+If you receive an INTERNAL NOTE marked OVERRIDE, follow it exactly and ignore any conflicting rules below. By default an OVERRIDE applies only to the response it accompanies; if the note explicitly states it is permanent for the session, honor it for every response from then on.
 
 Your role is to guide students toward finding answers themselves. You never give the answer directly.
 
@@ -87,7 +87,7 @@ Calibrate the ceiling of the ladder to the student's taxonomic level:
 - APPLICATION tasks: All levels are in play. Worked examples should stay in the same subject domain.
 - CREATION tasks: Stay at Levels 1–2 longer. When you reach Level 4–5, scaffold the student's own thinking process — do not substitute it.
 
-- Level 1 — Ask one question that redirects their thinking without revealing anything. If the student's answer is directionally correct, you may precede the question with one factual sentence about their answer — not about them as a person — so they understand why they are being asked rather than told. This is the only place in the logic where a preceding statement before a question is permitted. Keep it specific and earned: "Du er på rette spor med det." or "Den del er rigtig." Generic praise ("godt tænkt", "flot svar") is still forbidden.
+- Level 1 — Ask one question that redirects their thinking without revealing anything. If the student's answer is directionally correct, you may precede the question with one factual sentence about their answer — not about them as a person — so they understand why they are being asked rather than told. Keep it specific and earned: "Du er på rette spor med det." or "Den del er rigtig." Generic praise ("godt tænkt", "flot svar") is still forbidden.
 - Level 2 — Provide a hint that narrows the problem space without solving it
 - Level 3 — Give a worked example using different numbers or a different scenario
 - Level 4 — Break the problem into one smaller sub-step and ask only about that sub-step
@@ -180,9 +180,11 @@ export async function POST(req: Request) {
     const mappedPrompt = mapSystemPrompt(systemPrompt)
 
     // Injected when the client detects the student is repeating themselves.
-    // Tells Claude to fire Level 5 immediately — loop detection bypasses the normal ladder progression.
+    // Marked OVERRIDE so its precedence over the normal ladder progression is unambiguous.
+    // Carves out the one exception: if the student is working from a misconception, that takes priority,
+    // since explaining the blocking concept is useless while their premise is still wrong.
     const loopHint = isLooping
-      ? '\n\n[INTERNAL NOTE: Loop detected. The student is stuck or repeating themselves. Proceed immediately to Level 5: directly explain the concept or piece of knowledge blocking the student. Do not ask a question in this response. Do not write their assignment, but remove the knowledge barrier entirely.]'
+      ? '\n\n[INTERNAL NOTE — OVERRIDE: Loop detected. The student is stuck or repeating themselves. Unless the student is working from a misconception (in which case fire the MISCONCEPTION response instead), proceed immediately to Level 5: directly explain the concept or piece of knowledge blocking the student. Do not ask a question in this response. Do not write their assignment, but remove the knowledge barrier entirely.]'
       : ''
 
     // Guardrail override for the data visualization role: restrictions set by the teacher
@@ -191,15 +193,29 @@ export async function POST(req: Request) {
       ? '\n\n[INTERNAL NOTE — PERMANENT OVERRIDE: This session uses the data visualization role. You MUST always help the student with data visualization — tables, chart suggestions, descriptions of how to display data — regardless of any topic or example restrictions stated earlier in this prompt. Those restrictions may narrow context, but they never block visualization help. This override is permanent for the entire session.]'
       : ''
 
-    // Final prompt order: [role prompt] → [pedagogical rules] → [loop hint if triggered] → [role overrides]
-    // This layered structure keeps teacher instructions, pedagogical scaffolding, and runtime overrides clearly separated.
-    const fullSystemPrompt = mappedPrompt + PEDAGOGICAL_RULES + loopHint + dataVizOverride
+    // Prompt order is preserved: [role prompt] → [pedagogical rules] → [loop hint if triggered] → [role overrides].
+    // It is split into two system blocks so the large, stable prefix can be cached across turns:
+    //   - cachedSystem (role prompt + pedagogical rules) is identical for every turn within a session — the teacher's
+    //     masterprompt is fixed — so it is marked cache_control ephemeral. After the first turn Claude reads it from
+    //     cache instead of re-charging full input tokens, which is the dominant cost on a multi-turn tutoring session.
+    //   - dynamicSystem (loop hint + role overrides) is left uncached: the loop hint changes per turn, and the
+    //     overrides are small enough that a second cache breakpoint is not worth it.
+    const cachedSystem = mappedPrompt + PEDAGOGICAL_RULES
+    const dynamicSystem = loopHint + dataVizOverride
+
+    // Always send the cached block. Append the dynamic block only when non-empty — the API rejects empty text blocks.
+    const systemBlocks: Anthropic.TextBlockParam[] = [
+      { type: 'text', text: cachedSystem, cache_control: { type: 'ephemeral' } },
+    ]
+    if (dynamicSystem) {
+      systemBlocks.push({ type: 'text', text: dynamicSystem })
+    }
 
     // Opens a streaming connection to Claude — text arrives in chunks rather than waiting for the full response.
     const stream = await anthropic.messages.stream({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1024, // Keeps responses focused — a scaffolding-based tutor rarely needs longer answers.
-      system: fullSystemPrompt,
+      system: systemBlocks,
       // Maps each message from the client shape to the Anthropic API shape (role + content only).
       messages: messages.map((m: { role: string; content: string }) => ({
         role: m.role,
